@@ -13,68 +13,16 @@ const professorSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    currScore: Number,
+    pastSentiments:[
+      {
+        score: Number,
+      }
+    ],
     email: String,
     officeLocation: String,
     imageUrl: String,
     
-    // Aggregate Scores (0-100 scale)
-    overallScore: {
-      type: Number,
-      default: 50,
-      min: 0,
-      max: 100,
-    },
-    setScore: {
-      type: Number,
-      default: 50,
-      min: 0,
-      max: 100,
-    },
-    rateMyProfScore: {
-      type: Number,
-      default: 50,
-      min: 0,
-      max: 100,
-    },
-    redditScore: {
-      type: Number,
-      default: 50,
-      min: 0,
-      max: 100,
-    },
-    capeEvalScore: {
-      type: Number,
-      default: 50,
-      min: 0,
-      max: 100,
-    },
-
-    // Reference arrays to reviews
-    rateMyProfEvals: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'RateMyProf',
-      },
-    ],
-    setEvals: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'SetEval',
-      },
-    ],
-    capeEvals: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'CapeEval',
-      },
-    ],
-    redditEvals: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'RedditReview',
-      },
-    ],
-
     // Stock Market Information
     stockPrice: {
       type: Number,
