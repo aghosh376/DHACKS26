@@ -1,19 +1,45 @@
+import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+import Dashboard from './pages/Dashboard';
+import ProtectedRoute from './components/ProtectedRoute';
+
 export default function App() {
+  const [token, setToken] = useState(() => {
+    return localStorage.getItem('token') || null;
+  });
+
+  const [user, setUser] = useState(() => {
+    const stored = localStorage.getItem('user');
+    return stored ? JSON.parse(stored) : null;
+  });
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-4xl font-bold text-center text-indigo-900 mb-4">
-          Professor Stock Market
-        </h1>
-        <p className="text-center text-gray-600 mb-8">
-          Coming soon... Backend is running on http://localhost:5000
-        </p>
-        <div className="bg-white rounded-lg shadow-lg p-6 max-w-md mx-auto">
-          <h2 className="text-2xl font-semibold text-gray-800 mb-4">Status</h2>
-          <p className="text-gray-600">Frontend: ✅ Running on port 3000</p>
-          <p className="text-gray-600">Backend: 🚀 Check http://localhost:5000/api/health</p>
-        </div>
-      </div>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route
+          path="/login"
+          element={
+            token ? <Navigate to="/dashboard" replace /> : <Login setToken={setToken} setUser={setUser} />
+          }
+        />
+        <Route
+          path="/signup"
+          element={
+            token ? <Navigate to="/dashboard" replace /> : <Signup setToken={setToken} setUser={setUser} />
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute token={token}>
+              <Dashboard user={user} setToken={setToken} setUser={setUser} />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/" element={<Navigate to={token ? '/dashboard' : '/login'} replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
