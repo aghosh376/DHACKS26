@@ -51,7 +51,7 @@ const ProfessorCard: FC<ProfessorCardProps> = ({
         {/* Prevent the React '0' rendering bug */}
         {professor.rating != null && (
           <p className="text-xs text-muted-foreground mb-3">
-            Rating: <span className="font-mono font-semibold text-foreground">{professor.rating.toFixed(1)}</span>/5
+            Rating: <span className="font-mono font-semibold text-foreground">{Math.round(((professor.rating - 1) / 4) * 100)}</span>/100
           </p>
         )}
 
@@ -108,7 +108,7 @@ const ProfessorCard: FC<ProfessorCardProps> = ({
         <div className="flex justify-between mb-4 text-xs text-muted-foreground font-mono">
           <span>Vol: {(stock?.volume || 0).toLocaleString()}</span>
           <span>Sent: {professor.sentiment || 0}%</span>
-          <span>★ {professor.rating?.toFixed(1) || "N/A"}</span>
+          <span>★ {professor.rating != null ? Math.round(((professor.rating - 1) / 4) * 100) : "N/A"}/100</span>
         </div>
 
         {/* Action Buttons */}
