@@ -515,6 +515,7 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }: DashboardPro
       {/* Buy Modal */}
       {selectedProfessor && selectedStock && (
         <BuyModal
+          professorId={selectedProfessor._id}
           professorName={selectedProfessor.name}
           stockPrice={selectedStock.currentPrice}
           userBalance={user.balance || 0}
@@ -532,6 +533,7 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }: DashboardPro
       {/* Sell Modal */}
       {selectedProfessor && selectedStock && (
         <SellModal
+          professorId={selectedProfessor._id}
           professorName={selectedProfessor.name}
           stockPrice={selectedStock.currentPrice}
           userShares={selectedProfessorShares}

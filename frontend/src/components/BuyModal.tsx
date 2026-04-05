@@ -1,6 +1,8 @@
 import { FC, useState } from 'react';
+import StockChart from './StockChart';
 
 interface BuyModalProps {
+  professorId: string;
   professorName: string;
   stockPrice: number;
   userBalance: number;
@@ -11,6 +13,7 @@ interface BuyModalProps {
 }
 
 const BuyModal: FC<BuyModalProps> = ({
+  professorId,
   professorName,
   stockPrice,
   userBalance,
@@ -70,80 +73,89 @@ const BuyModal: FC<BuyModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4">
         {/* Header */}
         <div className="bg-gradient-to-r from-green-600 to-green-700 px-6 py-4 text-white">
           <h2 className="text-2xl font-bold">Buy Stocks</h2>
           <p className="text-green-100">{professorName}</p>
         </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-4">
-          {/* Price Info */}
-          <div>
-            <p className="text-sm text-gray-600 font-medium mb-1">Price per Share</p>
-            <p className="text-2xl font-bold text-green-600">${stockPrice.toFixed(2)}</p>
+        {/* Content — chart + form side by side */}
+        <div className="flex flex-col md:flex-row">
+          {/* Chart */}
+          <div className="md:w-1/2 p-6 border-b md:border-b-0 md:border-r border-gray-200">
+            <p className="text-sm font-semibold text-gray-700 mb-2">Price History</p>
+            <StockChart professorId={professorId} />
           </div>
 
-          {/* Quantity Input */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Number of Shares
-            </label>
-            <input
-              type="number"
-              value={quantity}
-              onChange={(e) => handleQuantityChange(e.target.value)}
-              min="1"
-              max={maxAffordable}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              disabled={isLoading}
-            />
-            <p className="text-xs text-gray-500 mt-1">Max affordable: {maxAffordable} shares</p>
-          </div>
+          {/* Form */}
+          <div className="md:w-1/2 p-6 space-y-4">
+            {/* Price Info */}
+            <div>
+              <p className="text-sm text-gray-600 font-medium mb-1">Price per Share</p>
+              <p className="text-2xl font-bold text-green-600">${stockPrice.toFixed(2)}</p>
+            </div>
 
-          {/* Cost Summary */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <div className="flex justify-between mb-2">
-              <span className="text-gray-600">Quantity</span>
-              <span className="font-semibold">{quantity} shares</span>
+            {/* Quantity Input */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Number of Shares
+              </label>
+              <input
+                type="number"
+                value={quantity}
+                onChange={(e) => handleQuantityChange(e.target.value)}
+                min="1"
+                max={maxAffordable}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                disabled={isLoading}
+              />
+              <p className="text-xs text-gray-500 mt-1">Max affordable: {maxAffordable} shares</p>
             </div>
-            <div className="flex justify-between mb-2">
-              <span className="text-gray-600">Price per Share</span>
-              <span className="font-semibold">${stockPrice.toFixed(2)}</span>
-            </div>
-            <div className="border-t pt-2 flex justify-between">
-              <span className="font-bold text-gray-800">Total Cost</span>
-              <span className={`text-lg font-bold ${
-                totalCost <= userBalance ? 'text-green-600' : 'text-red-600'
-              }`}>
-                ${totalCost.toFixed(2)}
-              </span>
-            </div>
-          </div>
 
-          {/* Balance */}
-          <div className="bg-blue-50 p-3 rounded-lg">
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-700">Available Balance</span>
-              <span className="font-bold text-blue-600">${userBalance.toFixed(2)}</span>
+            {/* Cost Summary */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="flex justify-between mb-2">
+                <span className="text-gray-600">Quantity</span>
+                <span className="font-semibold">{quantity} shares</span>
+              </div>
+              <div className="flex justify-between mb-2">
+                <span className="text-gray-600">Price per Share</span>
+                <span className="font-semibold">${stockPrice.toFixed(2)}</span>
+              </div>
+              <div className="border-t pt-2 flex justify-between">
+                <span className="font-bold text-gray-800">Total Cost</span>
+                <span className={`text-lg font-bold ${
+                  totalCost <= userBalance ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  ${totalCost.toFixed(2)}
+                </span>
+              </div>
             </div>
-            <div className="flex justify-between mt-1">
-              <span className="text-sm text-gray-700">After Purchase</span>
-              <span className={`font-bold ${
-                userBalance - totalCost >= 0 ? 'text-green-600' : 'text-red-600'
-              }`}>
-                ${(userBalance - totalCost).toFixed(2)}
-              </span>
-            </div>
-          </div>
 
-          {/* Error Message */}
-          {error && (
-            <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm font-medium">
-              {error}
+            {/* Balance */}
+            <div className="bg-blue-50 p-3 rounded-lg">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-700">Available Balance</span>
+                <span className="font-bold text-blue-600">${userBalance.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between mt-1">
+                <span className="text-sm text-gray-700">After Purchase</span>
+                <span className={`font-bold ${
+                  userBalance - totalCost >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  ${(userBalance - totalCost).toFixed(2)}
+                </span>
+              </div>
             </div>
-          )}
+
+            {/* Error Message */}
+            {error && (
+              <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm font-medium">
+                {error}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Footer */}
