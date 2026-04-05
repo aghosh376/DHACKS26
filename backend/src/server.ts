@@ -44,15 +44,25 @@ app.use(errorHandler);
  * Market Entropy Engine: Apply random price fluctuations every 10 seconds
  * Each stock moves independently with ±1-2% random movements
  */
+let isEntropyRunning = false;
+
 const startMarketEntropyEngine = async (): Promise<void> => {
   // Wait for DB to be ready
   while (!dbConnected) {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
 
-  console.log('✅ Market entropy engine activated - starting price fluctuations');
+  console.log('✅ Market entropy engine activated - starting price fluctuations every 10 seconds');
   
   setInterval(async () => {
+    // Skip if already running to prevent overlapping updates
+    if (isEntropyRunning) {
+      console.log('⏭️  Entropy cycle skipped - previous cycle still running');
+      return;
+    }
+    
+    isEntropyRunning = true;
+    
     try {
       const stocks = await Stock.find();
       let updatedCount = 0;
@@ -61,23 +71,19 @@ const startMarketEntropyEngine = async (): Promise<void> => {
         const oldPrice = stock.currentPrice;
         const newPrice = applyMarketEntropy(oldPrice);
         
-        // Update price
-        stock.currentPrice = newPrice;
-        
-        // Update price history
-        stock.priceHistory = updatePriceHistory(stock.priceHistory, newPrice);
-        
-        // Update 24h change
+        // Update using atomic operation to avoid concurrency issues
+        const updatedPriceHistory = updatePriceHistory(stock.priceHistory, newPrice);
         const percentChange24h = calculatePercentChange(oldPrice, newPrice);
-        stock.percentChange24h = percentChange24h;
+        const newMarketCap = newPrice * stock.sharesOutstanding;
         
-        // Update market cap
-        stock.marketCap = newPrice * stock.sharesOutstanding;
+        await Stock.findByIdAndUpdate(stock._id, {
+          currentPrice: newPrice,
+          priceHistory: updatedPriceHistory,
+          percentChange24h: percentChange24h,
+          marketCap: newMarketCap,
+          lastUpdated: new Date(),
+        });
         
-        // Update last modified timestamp
-        stock.lastUpdated = new Date();
-        
-        await stock.save();
         updatedCount++;
         
         // Log each stock's independent movement
@@ -91,6 +97,8 @@ const startMarketEntropyEngine = async (): Promise<void> => {
       console.log(`✅ Market entropy cycle: Updated ${updatedCount} stocks`);
     } catch (error) {
       console.error('Market entropy engine error:', error);
+    } finally {
+      isEntropyRunning = false;
     }
   }, 10000); // Run every 10 seconds
 };
