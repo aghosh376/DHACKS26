@@ -48,12 +48,12 @@ const stockSchema = new Schema<IStockDocument>(
     },
     currentPrice: {
       type: Number,
-      default: 50,
+      default: () => Math.random() * (55 - 45) + 45, // Random between $45-$55
       min: 0.01,
     },
     baselinePrice: {
       type: Number,
-      default: 50,
+      default: () => Math.random() * (55 - 45) + 45, // Random between $45-$55
       min: 0.01,
     },
     high24h: Number,

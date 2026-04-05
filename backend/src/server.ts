@@ -10,7 +10,14 @@ dotenv.config();
 
 const app: Express = express();
 
-connectDB();
+// Initialize DB connection
+let dbConnected = false;
+connectDB().then(() => {
+  dbConnected = true;
+  console.log('DB ready - entropy engine will start');
+}).catch(err => {
+  console.error('DB connection failed:', err);
+});
 
 app.use(cors());
 app.use(express.json());
@@ -33,63 +40,64 @@ app.get('/api/health', (req, res) => {
 app.use(errorHandler);
 
 /**
- * Market Entropy Engine: Apply random price fluctuations every 30 seconds
+ * Market Entropy Engine: Apply random price fluctuations every 10 seconds
  * Each stock moves independently with ±1-2% random movements
  */
-const startMarketEntropyEngine = (): void => {
+const startMarketEntropyEngine = async (): Promise<void> => {
+  // Wait for DB to be ready
+  while (!dbConnected) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+
+  console.log('✅ Market entropy engine activated - starting price fluctuations');
+  
   setInterval(async () => {
     try {
-      const stocks = await Stock.find().populate('professorId', 'name');
+      const stocks = await Stock.find();
       let updatedCount = 0;
       
       for (const stock of stocks) {
         const oldPrice = stock.currentPrice;
         const newPrice = applyMarketEntropy(oldPrice);
         
-        // Only update if there's a price change
-        if (Math.abs(newPrice - oldPrice) > 0.001) {
-          stock.currentPrice = newPrice;
-          
-          // Update price history
-          stock.priceHistory = updatePriceHistory(stock.priceHistory, newPrice);
-          
-          // Update 24h change
-          const percentChange24h = calculatePercentChange(oldPrice, newPrice);
-          stock.percentChange24h = percentChange24h;
-          
-          // Update market cap
-          stock.marketCap = newPrice * stock.sharesOutstanding;
-          
-          // Update last modified timestamp
-          stock.lastUpdated = new Date();
-          
-          await stock.save();
-          updatedCount++;
-          
-          // Log each stock's independent movement
-          const professorName = (stock.populatedPaths().includes('professorId') ? 
-            (stock.professorId as any)?.name : 'Unknown');
-          const percentageChange = ((newPrice - oldPrice) / oldPrice * 100).toFixed(2);
-          console.log(
-            `📊 ${professorName}: $${oldPrice.toFixed(2)} → $${newPrice.toFixed(2)} (${percentageChange}%)`
-          );
-        }
+        // Update price
+        stock.currentPrice = newPrice;
+        
+        // Update price history
+        stock.priceHistory = updatePriceHistory(stock.priceHistory, newPrice);
+        
+        // Update 24h change
+        const percentChange24h = calculatePercentChange(oldPrice, newPrice);
+        stock.percentChange24h = percentChange24h;
+        
+        // Update market cap
+        stock.marketCap = newPrice * stock.sharesOutstanding;
+        
+        // Update last modified timestamp
+        stock.lastUpdated = new Date();
+        
+        await stock.save();
+        updatedCount++;
+        
+        // Log each stock's independent movement
+        const percentageChange = ((newPrice - oldPrice) / oldPrice * 100).toFixed(2);
+        const direction = newPrice > oldPrice ? '📈' : '📉';
+        console.log(
+          `${direction} Stock #${stock._id.toString().slice(-4)}: $${oldPrice.toFixed(2)} → $${newPrice.toFixed(2)} (${percentageChange}%)`
+        );
       }
       
-      if (updatedCount > 0) {
-        console.log(`✅ Market entropy: Updated ${updatedCount}/${stocks.length} stocks`);
-      }
+      console.log(`✅ Market entropy cycle: Updated ${updatedCount} stocks`);
     } catch (error) {
       console.error('Market entropy engine error:', error);
     }
-  }, 30000); // Run every 30 seconds
+  }, 10000); // Run every 10 seconds
 };
 
-// Start market entropy engine after a short delay to allow DB connection
+// Start market entropy engine once DB connects
 setTimeout(() => {
-  startMarketEntropyEngine();
-  console.log('Market entropy engine started - prices will fluctuate every 30 seconds');
-}, 2000);
+  startMarketEntropyEngine().catch(err => console.error('Entropy engine error:', err));
+}, 1000);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

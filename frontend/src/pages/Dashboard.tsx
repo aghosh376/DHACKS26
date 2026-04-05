@@ -55,10 +55,15 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }: DashboardPro
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
   const [selectedProfessorShares, setSelectedProfessorShares] = useState(0);
 
+  // Search and filter states
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
+
   const token = localStorage.getItem('token');
 
+  // Initial data fetch on mount
   useEffect(() => {
-    const fetchData = async (): Promise<void> => {
+    const fetchInitialData = async (): Promise<void> => {
       try {
         setLoading(true);
         const headers = {
@@ -78,7 +83,31 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }: DashboardPro
       }
     };
 
-    fetchData();
+    fetchInitialData();
+  }, [token]);
+
+  // Auto-refresh stock prices every 10 seconds (matches backend entropy interval)
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const headers = {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        };
+
+        const stocksRes = await fetch('/api/stocks', { headers });
+        if (stocksRes.ok) {
+          const stocksData = await stocksRes.json();
+          // Silently update stocks without affecting search/filter state
+          setStocks(stocksData.data || []);
+        }
+      } catch (err) {
+        // Silently fail on polling errors - don't disrupt user
+        console.debug('Stock price refresh error:', err);
+      }
+    }, 10000); // Poll every 10 seconds
+
+    return () => clearInterval(interval);
   }, [token]);
 
   const getUserShares = (professorId: string | { _id: string }): number => {
@@ -94,6 +123,41 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }: DashboardPro
       user?.stocksOwned?.find((holding) => holding.professorId === id)
         ?.averageBuyPrice || 0
     );
+  };
+
+  // Get all unique departments from stocks
+  const getAllDepartments = (): string[] => {
+    const departments = new Set<string>();
+    stocks.forEach((stock) => {
+      const professorData = stock.professorId as any;
+      if (professorData?.department) {
+        departments.add(professorData.department);
+      }
+    });
+    return Array.from(departments).sort();
+  };
+
+  // Filter stocks based on search term and department
+  const getFilteredStocks = (): Stock[] => {
+    return stocks.filter((stock) => {
+      const professorData = stock.professorId as any;
+      if (!professorData) return false;
+
+      // Apply department filter
+      if (selectedDepartment !== 'all' && professorData.department !== selectedDepartment) {
+        return false;
+      }
+
+      // Apply search filter
+      if (searchTerm.trim() !== '') {
+        const searchLower = searchTerm.toLowerCase();
+        const nameMatch = professorData.name?.toLowerCase().includes(searchLower) || false;
+        const deptMatch = professorData.department?.toLowerCase().includes(searchLower) || false;
+        return nameMatch || deptMatch;
+      }
+
+      return true;
+    });
   };
 
   const handleBuyClick = (professorId: string, stock: Stock): void => {
@@ -356,17 +420,66 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }: DashboardPro
         <div>
           <h3 className="text-2xl font-bold text-gray-800 mb-6">Trade Professors</h3>
 
+          {/* Search and Filter Bar */}
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Search Bar */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Search Professors
+                </label>
+                <input
+                  type="text"
+                  placeholder="Search by name or department..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                />
+              </div>
+
+              {/* Department Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Filter by Department
+                </label>
+                <select
+                  value={selectedDepartment}
+                  onChange={(e) => setSelectedDepartment(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                >
+                  <option value="all">All Departments</option>
+                  {getAllDepartments().map((dept) => (
+                    <option key={dept} value={dept}>
+                      {dept}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Results Counter */}
+          {!loading && (
+            <div className="mb-4 text-sm text-gray-600">
+              Showing {getFilteredStocks().length} of {stocks.length} professors
+            </div>
+          )}
+
           {loading ? (
             <div className="text-center py-12">
               <p className="text-gray-600">Loading professors and stocks...</p>
             </div>
-          ) : stocks.length === 0 ? (
+          ) : getFilteredStocks().length === 0 ? (
             <div className="text-center py-12 bg-white rounded-lg">
-              <p className="text-gray-600">No professors available for trading yet.</p>
+              <p className="text-gray-600">
+                {stocks.length === 0
+                  ? 'No professors available for trading yet.'
+                  : 'No professors match your search or filter. Try adjusting your criteria.'}
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {stocks.map((stock) => {
+              {getFilteredStocks().map((stock) => {
                 // Extract professor data from populated professorId
                 const professorData = stock.professorId as any;
                 if (!professorData || !professorData._id) return null;

@@ -40,19 +40,6 @@ const ProfessorCard: FC<ProfessorCardProps> = ({
 
   return (
     <div className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
-      {/* Professor Image */}
-      <div className="w-full h-48 bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center overflow-hidden">
-        {professor.imageUrl ? (
-          <img
-            src={professor.imageUrl}
-            alt={professor.name}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="text-white text-6xl">👨‍🏫</div>
-        )}
-      </div>
-
       {/* Card Content */}
       <div className="p-6">
         {/* Professor Info */}
