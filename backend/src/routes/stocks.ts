@@ -169,14 +169,6 @@ router.post('/:professorId/buy', authenticate, async (req: Request, res: Respons
       });
     }
 
-    const user = await User.findById(req.userId) as IUserDocument;
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found',
-      });
-    }
-
     const stock = await Stock.findOne({ professorId }) as IStockDocument;
     if (!stock) {
       return res.status(404).json({
@@ -188,10 +180,18 @@ router.post('/:professorId/buy', authenticate, async (req: Request, res: Respons
     const costPerShare = stock.currentPrice;
     const totalCost = costPerShare * quantity;
 
-    if (user.balance < totalCost) {
+    const user = await User.findOneAndUpdate(
+      { _id: req.userId, balance: { $gte: totalCost } },
+      { $inc: { balance: -totalCost, totalInvested: totalCost } },
+      { new: true }
+    ) as IUserDocument | null;
+
+    if (!user) {
+      const currentBalance = await User.findById(req.userId).select('balance').lean();
+      const available = currentBalance?.balance ?? 0;
       return res.status(400).json({
         success: false,
-        message: `Insufficient balance. Required: $${totalCost.toFixed(2)}, Available: $${user.balance.toFixed(2)}`,
+        message: `Insufficient balance. Required: $${totalCost.toFixed(2)}, Available: $${available.toFixed(2)}`,
       });
     }
 
@@ -212,8 +212,6 @@ router.post('/:professorId/buy', authenticate, async (req: Request, res: Respons
     const percentChange24h = calculatePercentChange(oldPrice, newPrice);
     stock.percentChange24h = percentChange24h;
 
-    // 7d/1m/6m changes are recalculated from price history relative to the
-    // historical price at each cutoff, not accumulated per-transaction.
     const now = Date.now();
     const priceAt = (msBack: number) => {
       const cutoff = now - msBack;
@@ -227,45 +225,70 @@ router.post('/:professorId/buy', authenticate, async (req: Request, res: Respons
     stock.priceHistory = updatePriceHistory(stock.priceHistory, newPrice);
     stock.lastUpdated = new Date();
 
-    user.balance -= totalCost;
-    user.totalInvested = (user.totalInvested || 0) + totalCost;
-
     const stockOwnership = user.stocksOwned.find(
       (s) => s.professorId.toString() === professorId
     );
 
+    let updatedHolding = null as any;
     if (stockOwnership) {
       const newTotalShares = stockOwnership.shares + quantity;
       const newTotalCost = (stockOwnership.costBasis || 0) + totalCost;
+      const newAverageBuyPrice = newTotalCost / newTotalShares;
+      const newCurrentValue = newTotalShares * newPrice;
+      const gainLoss = newCurrentValue - newTotalCost;
+      const percentReturn = newTotalCost > 0 ? (gainLoss / newTotalCost) * 100 : 0;
 
-      stockOwnership.shares = newTotalShares;
-      stockOwnership.averageBuyPrice = newTotalCost / newTotalShares;
-      stockOwnership.totalInvested = newTotalCost;
-      stockOwnership.costBasis = newTotalCost;
-      stockOwnership.currentValue = newTotalShares * newPrice;
-      stockOwnership.gainLoss = stockOwnership.currentValue - newTotalCost;
-      stockOwnership.percentReturn = (stockOwnership.gainLoss / newTotalCost) * 100;
+      await User.updateOne(
+        { _id: req.userId, 'stocksOwned.professorId': stock.professorId },
+        {
+          $inc: {
+            'stocksOwned.$.shares': quantity,
+            'stocksOwned.$.totalInvested': totalCost,
+            'stocksOwned.$.costBasis': totalCost,
+          },
+          $set: {
+            'stocksOwned.$.averageBuyPrice': newAverageBuyPrice,
+            'stocksOwned.$.currentValue': newCurrentValue,
+            'stocksOwned.$.gainLoss': gainLoss,
+            'stocksOwned.$.percentReturn': percentReturn,
+          },
+        }
+      );
+
+      updatedHolding = {
+        ...stockOwnership,
+        shares: newTotalShares,
+        averageBuyPrice: newAverageBuyPrice,
+        totalInvested: newTotalCost,
+        costBasis: newTotalCost,
+        currentValue: newCurrentValue,
+        gainLoss,
+        percentReturn,
+      };
     } else {
-      user.stocksOwned.push({
+      const newHolding = {
         professorId: stock.professorId,
         shares: quantity,
         averageBuyPrice: costPerShare,
         totalInvested: totalCost,
         costBasis: totalCost,
-        currentValue: totalCost,
+        currentValue: quantity * newPrice,
         gainLoss: 0,
         percentReturn: 0,
-      });
+      };
+
+      await User.updateOne({ _id: req.userId }, { $push: { stocksOwned: newHolding } });
+      updatedHolding = newHolding;
     }
 
-    user.portfolioValue = user.balance;
-    for (const holding of user.stocksOwned) {
-      if (holding.shares > 0) {
-        user.portfolioValue += holding.currentValue;
+    const portfolioValue = user.balance + user.stocksOwned.reduce((sum, holding) => {
+      if (holding.professorId.toString() === professorId) {
+        return sum + (updatedHolding?.currentValue || 0);
       }
-    }
+      return sum + (holding.currentValue || 0);
+    }, 0) + (stockOwnership ? 0 : (updatedHolding?.currentValue || 0));
 
-    await Promise.all([user.save(), stock.save()]);
+    await stock.save();
 
     const transaction = new Transaction({
       userId: req.userId,
@@ -278,8 +301,7 @@ router.post('/:professorId/buy', authenticate, async (req: Request, res: Respons
     });
     await transaction.save();
 
-    user.transactionHistory.push(transaction._id);
-    await user.save();
+    await User.updateOne({ _id: req.userId }, { $push: { transactionHistory: transaction._id }, $set: { portfolioValue } });
 
     res.json({
       success: true,
@@ -302,8 +324,8 @@ router.post('/:professorId/buy', authenticate, async (req: Request, res: Respons
         },
         user: {
           newBalance: user.balance.toFixed(2),
-          portfolioValue: user.portfolioValue.toFixed(2),
-          holdings: stockOwnership,
+          portfolioValue: portfolioValue.toFixed(2),
+          holdings: updatedHolding,
         },
       },
     });
@@ -326,14 +348,6 @@ router.post('/:professorId/sell', authenticate, async (req: Request, res: Respon
       });
     }
 
-    const user = await User.findById(req.userId) as IUserDocument;
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found',
-      });
-    }
-
     const stock = await Stock.findOne({ professorId }) as IStockDocument;
     if (!stock) {
       return res.status(404).json({
@@ -342,19 +356,29 @@ router.post('/:professorId/sell', authenticate, async (req: Request, res: Respon
       });
     }
 
-    const stockOwnership = user.stocksOwned.find(
-      (s) => s.professorId.toString() === professorId
-    );
-
-    if (!stockOwnership || stockOwnership.shares < quantity) {
-      return res.status(400).json({
-        success: false,
-        message: `Insufficient shares. Owned: ${stockOwnership?.shares || 0}, Requested: ${quantity}`,
-      });
-    }
-
     const pricePerShare = stock.currentPrice;
     const totalProceeds = pricePerShare * quantity;
+
+    const user = await User.findOneAndUpdate(
+      {
+        _id: req.userId,
+        stocksOwned: { $elemMatch: { professorId: stock.professorId, shares: { $gte: quantity } } },
+      },
+      {
+        $inc: {
+          balance: totalProceeds,
+          'stocksOwned.$.shares': -quantity,
+        },
+      },
+      { new: true }
+    ) as IUserDocument | null;
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: `Insufficient shares. Requested: ${quantity}`,
+      });
+    }
 
     const oldPrice = stock.currentPrice;
     const newPrice = calculateNewPrice(quantity, oldPrice, stock.sharesOutstanding, 'sell');
@@ -386,71 +410,107 @@ router.post('/:professorId/sell', authenticate, async (req: Request, res: Respon
     stock.priceHistory = updatePriceHistory(stock.priceHistory, newPrice);
     stock.lastUpdated = new Date();
 
-    const gainLoss = totalProceeds - (stockOwnership.costBasis || 0);
+    const stockOwnership = user.stocksOwned.find(
+      (s) => s.professorId.toString() === professorId
+    );
 
-    stockOwnership.shares -= quantity;
-    if (stockOwnership.shares === 0) {
-      stockOwnership.currentValue = 0;
-      stockOwnership.gainLoss = 0;
-      stockOwnership.percentReturn = 0;
+    if (!stockOwnership) {
+      return res.status(400).json({
+        success: false,
+        message: `Insufficient shares. Requested: ${quantity}`,
+      });
+    }
+
+    let updatedHolding: any = {
+      ...stockOwnership,
+      shares: stockOwnership.shares,
+    };
+
+    if (stockOwnership.shares <= 0) {
+      updatedHolding = {
+        professorId: stock.professorId,
+        shares: 0,
+        averageBuyPrice: stockOwnership.averageBuyPrice,
+        totalInvested: stockOwnership.totalInvested,
+        costBasis: stockOwnership.costBasis,
+        currentValue: 0,
+        gainLoss: 0,
+        percentReturn: 0,
+      };
+      await User.updateOne({ _id: req.userId }, { $pull: { stocksOwned: { professorId: stock.professorId } } });
     } else {
-      stockOwnership.currentValue = stockOwnership.shares * newPrice;
-      stockOwnership.gainLoss = stockOwnership.currentValue - (stockOwnership.costBasis || 0);
-      stockOwnership.percentReturn = (stockOwnership.gainLoss / (stockOwnership.costBasis || 1)) * 100;
+      const currentValue = stockOwnership.shares * newPrice;
+      const gainLoss = currentValue - (stockOwnership.costBasis || 0);
+      const percentReturn = (stockOwnership.costBasis || 1) > 0 ? (gainLoss / stockOwnership.costBasis) * 100 : 0;
+
+      await User.updateOne(
+        { _id: req.userId, 'stocksOwned.professorId': stock.professorId },
+        {
+          $set: {
+            'stocksOwned.$.currentValue': currentValue,
+            'stocksOwned.$.gainLoss': gainLoss,
+            'stocksOwned.$.percentReturn': percentReturn,
+          },
+        }
+      );
+
+      updatedHolding = {
+        ...stockOwnership,
+        currentValue,
+        gainLoss,
+        percentReturn,
+      };
     }
 
-    user.balance += totalProceeds;
-
-    user.portfolioValue = user.balance;
-    for (const holding of user.stocksOwned) {
-      if (holding.shares > 0) {
-        user.portfolioValue += holding.currentValue;
-      }
+  const portfolioValue = user.balance + user.stocksOwned.reduce((sum, holding) => {
+    if (holding.professorId.toString() === professorId) {
+      return stockOwnership.shares <= 0 ? sum : sum + (updatedHolding?.currentValue || 0);
     }
+    return sum + (holding.currentValue || 0);
+  }, 0);
 
-    await Promise.all([user.save(), stock.save()]);
+  await stock.save();
 
-    const transaction = new Transaction({
-      userId: req.userId,
-      professorId,
-      type: 'sell',
-      quantity,
-      pricePerShare,
-      totalAmount: totalProceeds,
-      status: 'completed',
-    });
-    await transaction.save();
+  const transaction = new Transaction({
+    userId: req.userId,
+    professorId,
+    type: 'sell',
+    quantity,
+    pricePerShare,
+    totalAmount: totalProceeds,
+    status: 'completed',
+  });
+  await transaction.save();
 
-    user.transactionHistory.push(transaction._id);
-    await user.save();
+  await User.updateOne({ _id: req.userId }, { $push: { transactionHistory: transaction._id }, $set: { portfolioValue } });
 
-    res.json({
-      success: true,
-      message: `Successfully sold ${quantity} shares at $${pricePerShare.toFixed(2)}`,
-      data: {
-        transaction: {
-          id: transaction._id,
-          type: 'sell',
-          quantity,
-          pricePerShare,
-          totalAmount: totalProceeds,
-          timestamp: transaction.date,
-        },
-        stock: {
-          professorId,
-          oldPrice: oldPrice.toFixed(4),
-          newPrice: newPrice.toFixed(4),
-          percentChange: percentChange24h.toFixed(2),
-          marketCap: stock.marketCap.toFixed(2),
-        },
-        user: {
-          newBalance: user.balance.toFixed(2),
-          portfolioValue: user.portfolioValue.toFixed(2),
-          gainLoss: gainLoss.toFixed(2),
-          holdings: stockOwnership,
-        },
+  res.json({
+    success: true,
+    message: `Successfully sold ${quantity} shares at $${pricePerShare.toFixed(2)}`,
+    data: {
+      transaction: {
+        id: transaction._id,
+        type: 'sell',
+        quantity,
+        pricePerShare,
+        totalAmount: totalProceeds,
+        timestamp: transaction.date,
       },
-    });
+      stock: {
+        professorId,
+        oldPrice: oldPrice.toFixed(4),
+        newPrice: newPrice.toFixed(4),
+        percentChange: percentChange24h.toFixed(2),
+        marketCap: stock.marketCap.toFixed(2),
+      },
+      user: {
+        newBalance: user.balance.toFixed(2),
+        portfolioValue: portfolioValue.toFixed(2),
+        gainLoss: (updatedHolding.currentValue - (updatedHolding.costBasis || 0)).toFixed(2),
+        holdings: updatedHolding,
+      },
+    },
+  });
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     res.status(500).json({ success: false, error: errorMsg });

@@ -10,7 +10,10 @@ interface Props {
 }
 
 const PortfolioPanel = ({ portfolio, stocks, totalValue, totalPL }: Props) => {
-  const isUp = totalPL >= 0;
+  const safeTotalValue = Number.isFinite(totalValue) ? totalValue : 0;
+  const safeCash = Number.isFinite(portfolio.cash) ? portfolio.cash : 0;
+  const safeTotalPL = Number.isFinite(totalPL) ? totalPL : 0;
+  const isUp = safeTotalPL >= 0;
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5">
@@ -19,16 +22,16 @@ const PortfolioPanel = ({ portfolio, stocks, totalValue, totalPL }: Props) => {
       <div className="grid grid-cols-3 gap-3 mb-5">
         <div className="bg-secondary rounded-xl p-3 text-center">
           <div className="text-xs text-muted-foreground mb-1">Total Value</div>
-          <div className="font-mono font-bold text-lg">${totalValue.toFixed(2)}</div>
+          <div className="font-mono font-bold text-lg">${safeTotalValue.toFixed(2)}</div>
         </div>
         <div className="bg-secondary rounded-xl p-3 text-center">
           <div className="text-xs text-muted-foreground mb-1">Cash</div>
-          <div className="font-mono font-bold text-lg">${portfolio.cash.toFixed(2)}</div>
+          <div className="font-mono font-bold text-lg">${safeCash.toFixed(2)}</div>
         </div>
         <div className={`rounded-xl p-3 text-center ${isUp ? "bg-gain/10 glow-gain" : "bg-loss/10 glow-loss"}`}>
           <div className="text-xs text-muted-foreground mb-1">P/L</div>
           <div className={`font-mono font-bold text-lg ${isUp ? "text-gain" : "text-loss"}`}>
-            {isUp ? "+" : ""}${totalPL.toFixed(2)}
+            {isUp ? "+" : ""}${safeTotalPL.toFixed(2)}
           </div>
         </div>
       </div>

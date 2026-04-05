@@ -43,8 +43,11 @@ const SellModal: FC<SellModalProps> = ({
   const [quantity, setQuantity] = useState(1);
   const [error, setError] = useState("");
 
-  const totalProceeds = quantity * stockPrice;
-  const totalCost = quantity * averageBuyPrice;
+  const safeStockPrice = Number.isFinite(stockPrice) ? stockPrice : 0;
+  const safeAverageBuyPrice = Number.isFinite(averageBuyPrice) ? averageBuyPrice : 0;
+  const safeUserShares = Number.isFinite(userShares) ? userShares : 0;
+  const totalProceeds = quantity * safeStockPrice;
+  const totalCost = quantity * safeAverageBuyPrice;
   const gainLoss = totalProceeds - totalCost;
   const gainLossPercent = totalCost > 0 ? (gainLoss / totalCost) * 100 : 0;
   const isProfit = gainLoss >= 0;
@@ -53,13 +56,13 @@ const SellModal: FC<SellModalProps> = ({
     const num = parseInt(value) || 0;
     setError("");
     if (num < 0) { setError("Quantity must be positive"); return; }
-    if (num > userShares) { setError(`You only own ${userShares} shares`); setQuantity(userShares); return; }
+    if (num > safeUserShares) { setError(`You only own ${safeUserShares} shares`); setQuantity(safeUserShares); return; }
     setQuantity(num);
   };
 
   const handleConfirm = async () => {
     if (quantity < 1) { setError("Quantity must be at least 1"); return; }
-    if (quantity > userShares) { setError(`You only own ${userShares} shares`); return; }
+    if (quantity > safeUserShares) { setError(`You only own ${safeUserShares} shares`); return; }
     try {
       await onConfirm(quantity);
       setQuantity(1);
