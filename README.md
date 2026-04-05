@@ -52,23 +52,36 @@ backend/
 
 ## Getting Started
 
-### 1. Installation
+### 1. Setting up the program - Backend
+
+#### 1a. Backend installation
 ```bash
 npm install
 ```
 
-### 2. Environment Setup
+#### 1b. Environment Setup
 ```bash
 cp .env.example .env
 # Edit .env with your MongoDB URI and other credentials
 ```
 
-### 3. Run Development Server
+#### 1c. Run Development Server
+```bash
+npm start
+```
+Server will start on `http://localhost:5000`
+
+### 2. Setting up the program - Frontend
+#### 2a. Frontend installation
+```bash
+npm install
+```
+
+#### 2b. Run Frontend Server
 ```bash
 npm run dev
 ```
-
-Server will start on `http://localhost:5000`
+Server will start on `http://localhost:8080`
 
 ## API Endpoints
 
@@ -121,53 +134,20 @@ Where:
 - WRMP = 0.3 (30% weight for RateMyProfessor)
 - WReddit = 0.2 (20% weight for Reddit sentiment)
 
-## Next Steps
-
-### Immediate Priorities
-1. ✅ Create base models and schemas
-2. ✅ Set up routes structure
-3. ⬜ Implement authentication (JWT)
-4. ⬜ Build score aggregation engine
-5. ⬜ Create web scrapers (CAPE/SET, RMP, Reddit)
-6. ⬜ Implement stock trading logic
-7. ⬜ Build admin dashboard
-
-### Web Scraping Setup
-The application requires scrapers for:
-- **CAPE/SET**: Official UCSD evaluations (requires authentication)
-- **RateMyProfessor**: Public API or web scraping
-- **Reddit**: r/UCSD posts (using Reddit API)
-
-See `/scripts` directory for scraper implementations.
-
 ## Technology Stack
 - **Framework**: Express.js
 - **Database**: MongoDB with Mongoose ODM
 - **Authentication**: JWT (JSON Web Tokens)
 - **Password Hashing**: bcryptjs
 
-## Development Tips
+## Next Steps
 
-### Adding New Routes
-1. Create route file in `/routes`
-2. Import into `server.js`
-3. Add to Express with `app.use('/api/endpoint', routeHandler)`
+### Web Scraping
+Currently utilized scrapers:
+- **RateMyProfessor**: Web scraping via Browser Use
 
-### Adding New Models
-1. Create schema file in `/models`
-2. Use Mongoose schema validation
-3. Add indexes for frequently queried fields
+Scrapping to be added
+- **CAPE/SET**: Official UCSD evaluations (requires authentication)
+- **Reddit**: r/UCSD posts (using Reddit API/Browser Use)
 
-### Debugging
-- Use `console.log()` for debugging
-- Check MongoDB Atlas "Data Explorer" to verify data
-- Monitor network requests with browser DevTools
-
-## Production Checklist
-- [ ] Set environment variables in production
-- [ ] Enable HTTPS
-- [ ] Set up MongoDB backups
-- [ ] Configure CORS properly
-- [ ] Implement rate limiting
-- [ ] Set up logging/monitoring
-- [ ] Add database indexes for performance
+See `/scripts` directory for scraper implementations.
