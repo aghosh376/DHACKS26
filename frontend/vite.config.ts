@@ -7,32 +7,33 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
-    port: 8080,
+    port: 8080, // Kept 8080 for Lovable compatibility. Change to 3000 only if your backend CORS specifically requires it.
     hmr: {
       overlay: false,
     },
-    // --- ADDED PROXY CONFIGURATION ---
     proxy: {
-      '/api': {
-        target: 'http://localhost:5000', // Ensure this matches your Express server port
+      "/api": {
+        target: "http://localhost:5000",
         changeOrigin: true,
         secure: false,
-      }
-    }
-    // ---------------------------------
+      },
+    },
   },
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  plugins: [
+    react(),
+    mode === "development" && componentTagger(),
+  ].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
     dedupe: [
-      "react", 
-      "react-dom", 
-      "react/jsx-runtime", 
-      "react/jsx-dev-runtime", 
-      "@tanstack/react-query", 
-      "@tanstack/query-core"
+      "react",
+      "react-dom",
+      "react/jsx-runtime",
+      "react/jsx-dev-runtime",
+      "@tanstack/react-query",
+      "@tanstack/query-core",
     ],
   },
 }));
