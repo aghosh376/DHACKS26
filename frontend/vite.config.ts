@@ -11,12 +11,28 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
+    // --- ADDED PROXY CONFIGURATION ---
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000', // Ensure this matches your Express server port
+        changeOrigin: true,
+        secure: false,
+      }
+    }
+    // ---------------------------------
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
-    dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "@tanstack/react-query", "@tanstack/query-core"],
+    dedupe: [
+      "react", 
+      "react-dom", 
+      "react/jsx-runtime", 
+      "react/jsx-dev-runtime", 
+      "@tanstack/react-query", 
+      "@tanstack/query-core"
+    ],
   },
 }));
