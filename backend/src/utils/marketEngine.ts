@@ -197,6 +197,23 @@ export const calculateStockStats = (stock: IStockDocument): StockStats => {
   };
 };
 
+/**
+ * Apply random market entropy to stock price
+ * Each call generates independent ±1-2% random movement
+ * Simulates natural market volatility and speculation
+ */
+export const applyMarketEntropy = (
+  currentPrice: number
+): number => {
+  // Generate unique random percentage between -2% and +2%
+  // Each call gets fresh Math.random() for independence
+  const randomPercent = (Math.random() - 0.5) * 4; // Range: -2 to +2
+  const newPrice = currentPrice * (1 + randomPercent / 100);
+  
+  // Ensure price never goes below $0.01
+  return Math.max(0.01, newPrice);
+};
+
 export default {
   calculateNewPrice,
   getPriceElasticity,
@@ -205,4 +222,5 @@ export default {
   calculateHighLow,
   calculateMarketCap,
   calculateStockStats,
+  applyMarketEntropy,
 };
