@@ -1,7 +1,7 @@
-# Professor Stock Market - Backend Structure
+# Professor Stock Market
 
 ## Project Overview
-This is the backend for the Professor Stock Market platform, a prediction market where UCSD students can trade stocks tied to professor ratings and aggregate feedback.
+The project consists of the frontend and backend files necessary for the Professor Stock Market, a prediction market where UCSD students can trade stocks tied to professor ratings and aggregate feedback.
 
 ## Directory Structure
 
@@ -52,7 +52,7 @@ backend/
 
 ## Getting Started
 
-### 1. Setting up the program - Backend
+### Setting up the program - Backend
 
 #### 1a. Backend installation
 ```bash
@@ -71,8 +71,10 @@ npm start
 ```
 Server will start on `http://localhost:5000`
 
-### 2. Setting up the program - Frontend
+### Setting up the program - Frontend
+
 #### 2a. Frontend installation
+Open a new terminal window (keeping the previous one open)
 ```bash
 npm install
 ```
