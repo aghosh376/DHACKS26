@@ -25,6 +25,10 @@ import { scrapeRateMyProf, scrapeDayBackReddit } from './scraper.js';
 import { evaluateProfessorsFromReddit } from './redditEvaluator.js';
 import { applyDailyUpdate } from './stockPriceEngine.js';
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 async function runDailyUpdate() {
   const key = process.env.BROWSER_USE_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
@@ -50,7 +54,7 @@ async function runDailyUpdate() {
   for (const [profName, newRmpScore] of Object.entries(rmpScores)) {
     try {
       const professor = await Professor.findOne({
-        name: { $regex: new RegExp(`^${profName}$`, 'i') },
+        name: { $regex: new RegExp(`^${escapeRegex(profName)}$`, 'i') },
       });
       if (!professor) continue;
 
@@ -104,7 +108,7 @@ async function runDailyUpdate() {
 
       for (const [profName, evalResult] of Object.entries(redditEvals)) {
         await Professor.findOneAndUpdate(
-          { name: { $regex: new RegExp(`^${profName}$`, 'i') } },
+          { name: { $regex: new RegExp(`^${escapeRegex(profName)}$`, 'i') } },
           { $set: { redditScore: evalResult.score, lastUpdated: new Date() } }
         );
       }

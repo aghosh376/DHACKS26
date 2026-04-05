@@ -94,6 +94,10 @@ function isValidRMPDepartment(dept) {
   return VALID_RMP_DEPARTMENTS.some(d => lower.includes(d));
 }
 
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function run() {
@@ -149,7 +153,7 @@ async function run() {
     }));
 
     // Upsert professor
-    let professor = await Professor.findOne({ name: { $regex: new RegExp(`^${profName}$`, 'i') } });
+    let professor = await Professor.findOne({ name: { $regex: new RegExp(`^${escapeRegex(profName)}$`, 'i') } });
 
     if (!professor) {
       professor = await Professor.create({
