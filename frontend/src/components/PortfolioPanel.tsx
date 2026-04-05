@@ -33,17 +33,25 @@ const PortfolioPanel = ({ portfolio, stocks, totalValue, totalPL }: Props) => {
         </div>
       </div>
 
-      {portfolio.holdings.length === 0 ? (
+      {!portfolio?.holdings || portfolio.holdings.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-6">No holdings yet. Click a professor to start trading!</p>
       ) : (
         <div className="space-y-2">
           {portfolio.holdings.map(h => {
-            const prof = professors.find(p => p.id === h.professorId)!;
-            const stock = stocks.get(h.professorId)!;
-            const currentValue = stock.price * h.shares;
+            // Safely fallback if the MongoDB ID doesn't match the local array
+            const prof = professors.find(p => p.id === h.professorId) || {
+              avatar: "👨‍🏫",
+              ticker: h.professorId?.substring(0, 4).toUpperCase() || "PROF"
+            };
+
+            // Safely fallback if the stock isn't found in the map
+            const stock = stocks.get(h.professorId);
+            const currentPrice = stock?.price || h.avgCost || 0;
+
+            const currentValue = currentPrice * h.shares;
             const costBasis = h.avgCost * h.shares;
             const pl = currentValue - costBasis;
-            const plPercent = (pl / costBasis) * 100;
+            const plPercent = costBasis > 0 ? (pl / costBasis) * 100 : 0;
             const holdingUp = pl >= 0;
 
             return (

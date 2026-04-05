@@ -18,6 +18,8 @@ interface BackendStock {
   currentPrice: number;
   percentChange24h: number;
   volume24h: number;
+  marketCap?: number;
+  priceHistory?: any[]; // Catch the array coming from your entropy engine
 }
 
 interface BackendProfessor {
@@ -150,17 +152,26 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
       backendStocks.forEach((s) => {
         const prof = s.professorId as any;
         if (!prof?._id) return;
+        
+        // Convert MongoDB priceHistory to the format the sparkline expects
+        const formattedHistory = Array.isArray(s.priceHistory)
+          ? s.priceHistory.map((val: any, i: number) => ({
+              time: val.time || i,
+              price: val.price || (typeof val === 'number' ? val : s.currentPrice),
+            }))
+          : [];
+
         m.set(prof._id, {
           professorId: prof._id,
-          price: s.currentPrice,
-          previousPrice: s.currentPrice,
+          price: s.currentPrice || 0,
+          previousPrice: s.currentPrice || 0,
           change: s.percentChange24h >= 0 ? 0.01 : -0.01,
-          changePercent: s.percentChange24h,
-          history: [],
-          volume: s.volume24h,
-          high: s.currentPrice,
-          low: s.currentPrice,
-          marketCap: 0,
+          changePercent: s.percentChange24h || 0,
+          history: formattedHistory,
+          volume: s.volume24h || 0,
+          high: s.currentPrice || 0,
+          low: s.currentPrice || 0,
+          marketCap: s.marketCap || 0,
         });
       });
       return m;
@@ -410,17 +421,26 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
           const p = s.professorId as any;
           if (!p?._id) return null;
           const professor: Professor = buildProfessor(p);
+          
+          // Convert MongoDB priceHistory to the format the sparkline expects
+          const formattedHistory = Array.isArray(s.priceHistory)
+            ? s.priceHistory.map((val: any, i: number) => ({
+                time: val.time || i,
+                price: val.price || (typeof val === 'number' ? val : s.currentPrice),
+              }))
+            : [];
+
           const stock: StockState = {
             professorId: p._id,
-            price: s.currentPrice,
-            previousPrice: s.currentPrice,
+            price: s.currentPrice || 0,
+            previousPrice: s.currentPrice || 0,
             change: s.percentChange24h >= 0 ? 0.01 : -0.01,
-            changePercent: s.percentChange24h,
-            history: [],
-            volume: s.volume24h,
-            high: s.currentPrice,
-            low: s.currentPrice,
-            marketCap: 0,
+            changePercent: s.percentChange24h || 0,
+            history: formattedHistory,
+            volume: s.volume24h || 0,
+            high: s.currentPrice || 0,
+            low: s.currentPrice || 0,
+            marketCap: s.marketCap || 0,
           };
           return { professor, stock, profBackendId: p._id };
         })
