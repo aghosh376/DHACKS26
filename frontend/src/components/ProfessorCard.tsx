@@ -1,29 +1,14 @@
-import { FC } from 'react';
-
-interface Stock {
-  _id: string;
-  professorId: string;
-  currentPrice: number;
-  percentChange24h: number;
-  volume24h: number;
-}
-
-interface Professor {
-  _id: string;
-  name: string;
-  department: string;
-  email?: string;
-  imageUrl?: string;
-  currScore?: number;
-}
+import { FC } from "react";
+import { motion } from "framer-motion";
+import type { Professor, StockState } from "@/lib/types";
 
 interface ProfessorCardProps {
   professor: Professor;
-  stock: Stock;
+  stock: StockState;
   userShares?: number;
   userBalance?: number;
-  onBuyClick: (professorId: string, stock: Stock) => void;
-  onSellClick: (professorId: string, stock: Stock, userShares: number) => void;
+  onBuyClick: (professorId: string) => void;
+  onSellClick: (professorId: string) => void;
 }
 
 const ProfessorCard: FC<ProfessorCardProps> = ({
@@ -34,67 +19,114 @@ const ProfessorCard: FC<ProfessorCardProps> = ({
   onBuyClick,
   onSellClick,
 }) => {
-  const priceChangeColor = stock.percentChange24h >= 0 ? 'text-green-600' : 'text-red-600';
-  const priceChangeBg = stock.percentChange24h >= 0 ? 'bg-green-50' : 'bg-red-50';
-  const priceChangeArrow = stock.percentChange24h >= 0 ? '↑' : '↓';
+  const isUp = stock.changePercent >= 0;
 
   return (
-    <div className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
-      {/* Card Content */}
-      <div className="p-6">
+    <motion.div
+      whileHover={{ scale: 1.02, y: -2 }}
+      whileTap={{ scale: 0.98 }}
+      className={`rounded-xl border bg-card overflow-hidden transition-shadow ${
+        isUp ? "border-gain/20 glow-gain" : "border-loss/20 glow-loss"
+      }`}
+    >
+      <div className="p-5">
         {/* Professor Info */}
-        <h3 className="text-xl font-bold text-gray-800 mb-1">{professor.name}</h3>
-        <p className="text-sm text-gray-600 mb-2">{professor.department}</p>
-        {professor.currScore && (
-          <p className="text-xs text-gray-500 mb-4">Rating: {professor.currScore.toFixed(2)}/5</p>
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">{professor.avatar}</span>
+            <div>
+              <div className="font-mono font-bold text-lg text-foreground">{professor.ticker}</div>
+              <div className="text-sm text-muted-foreground truncate max-w-[140px]">{professor.name}</div>
+            </div>
+          </div>
+          <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
+            {professor.department}
+          </span>
+        </div>
+
+        {professor.rating && (
+          <p className="text-xs text-muted-foreground mb-3">
+            Rating: <span className="font-mono font-semibold text-foreground">{professor.rating.toFixed(1)}</span>/5
+          </p>
         )}
 
         {/* Price Section */}
-        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-          <p className="text-xs text-gray-500 font-semibold mb-1">Stock Price</p>
+        <div className="mb-3 p-3 bg-secondary rounded-lg">
+          <p className="text-xs text-muted-foreground font-semibold mb-1">Stock Price</p>
           <div className="flex items-baseline justify-between">
-            <p className="text-2xl font-bold text-indigo-600">${stock.currentPrice.toFixed(2)}</p>
-            <div className={`text-sm font-semibold p-1 px-2 rounded ${priceChangeBg} ${priceChangeColor}`}>
-              {priceChangeArrow} {Math.abs(stock.percentChange24h).toFixed(2)}%
+            <p className="text-2xl font-mono font-bold text-foreground">${stock.price.toFixed(2)}</p>
+            <div
+              className={`text-sm font-mono font-semibold px-2 py-0.5 rounded ${
+                isUp ? "bg-gain/10 text-gain" : "bg-loss/10 text-loss"
+              }`}
+            >
+              {isUp ? "▲" : "▼"} {Math.abs(stock.changePercent).toFixed(2)}%
             </div>
           </div>
         </div>
 
         {/* User Holdings */}
         {userShares > 0 && (
-          <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-            <p className="text-xs text-gray-500 font-semibold mb-1">Your Holdings</p>
-            <p className="text-lg font-bold text-blue-600">{userShares} shares</p>
-            <p className="text-sm text-gray-600">
-              Value: ${(userShares * stock.currentPrice).toFixed(2)}
+          <div className="mb-3 p-3 bg-accent/10 rounded-lg">
+            <p className="text-xs text-muted-foreground font-semibold mb-1">Your Holdings</p>
+            <p className="text-lg font-mono font-bold text-accent">{userShares} shares</p>
+            <p className="text-sm text-muted-foreground">
+              Value: <span className="font-mono">${(userShares * stock.price).toFixed(2)}</span>
             </p>
           </div>
         )}
 
-        {/* Volume Info */}
-        <p className="text-xs text-gray-500 mb-4">24h Volume: {stock.volume24h} shares</p>
+        {/* Mini sparkline */}
+        <div className="h-10 flex items-end gap-[2px] mb-3">
+          {stock.history.slice(-20).map((point, i, arr) => {
+            const min = Math.min(...arr.map((p) => p.price));
+            const max = Math.max(...arr.map((p) => p.price));
+            const range = max - min || 1;
+            const height = ((point.price - min) / range) * 100;
+            return (
+              <div
+                key={i}
+                className={`flex-1 rounded-sm ${isUp ? "bg-gain/60" : "bg-loss/60"}`}
+                style={{ height: `${Math.max(5, height)}%` }}
+              />
+            );
+          })}
+        </div>
+
+        {/* Stats */}
+        <div className="flex justify-between mb-4 text-xs text-muted-foreground font-mono">
+          <span>Vol: {stock.volume.toLocaleString()}</span>
+          <span>Sent: {professor.sentiment}%</span>
+          <span>★ {professor.rating}</span>
+        </div>
 
         {/* Action Buttons */}
         <div className="flex gap-2">
           <button
-            onClick={() => onBuyClick(professor._id, stock)}
-            disabled={userBalance < stock.currentPrice}
-            className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
-            title={userBalance < stock.currentPrice ? 'Insufficient balance' : 'Buy stocks'}
+            onClick={(e) => {
+              e.stopPropagation();
+              onBuyClick(professor.id);
+            }}
+            disabled={userBalance < stock.price}
+            className="flex-1 rounded-lg bg-gain py-2 px-4 text-sm font-bold text-primary-foreground hover:bg-gain/90 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            title={userBalance < stock.price ? "Insufficient balance" : "Buy stocks"}
           >
             Buy
           </button>
           <button
-            onClick={() => onSellClick(professor._id, stock, userShares)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSellClick(professor.id);
+            }}
             disabled={userShares === 0}
-            className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
-            title={userShares === 0 ? 'You don\'t own any shares' : 'Sell stocks'}
+            className="flex-1 rounded-lg bg-loss py-2 px-4 text-sm font-bold text-destructive-foreground hover:bg-loss/90 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            title={userShares === 0 ? "You don't own any shares" : "Sell stocks"}
           >
             Sell
           </button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

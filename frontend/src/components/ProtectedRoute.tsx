@@ -1,16 +1,15 @@
-import { FC } from 'react';
+import { FC, ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 
-interface ProtectedRouteProps {
-  children: React.ReactNode;
+interface Props {
   token: string | null;
+  children: ReactNode;
 }
 
-const ProtectedRoute: FC<ProtectedRouteProps> = ({ children, token }) => {
+const ProtectedRoute: FC<Props> = ({ token, children }) => {
   if (!token) {
     return <Navigate to="/login" replace />;
   }
-
   return <>{children}</>;
 };
 

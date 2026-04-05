@@ -1,4 +1,12 @@
-import { FC, useState } from 'react';
+import { FC, useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface BuyModalProps {
   professorName: string;
@@ -19,152 +27,117 @@ const BuyModal: FC<BuyModalProps> = ({
   onClose,
   onConfirm,
 }) => {
-  const [quantity, setQuantity] = useState<number>(1);
-  const [error, setError] = useState<string>('');
+  const [quantity, setQuantity] = useState(1);
+  const [error, setError] = useState("");
 
   const totalCost = quantity * stockPrice;
   const maxAffordable = Math.floor(userBalance / stockPrice);
 
-  const handleQuantityChange = (value: string): void => {
+  const handleQuantityChange = (value: string) => {
     const num = parseInt(value) || 0;
-    setError('');
-
-    if (num < 0) {
-      setError('Quantity must be positive');
-      return;
-    }
-
-    if (num > maxAffordable) {
-      setError(`You can only afford ${maxAffordable} shares`);
-      setQuantity(maxAffordable);
-      return;
-    }
-
+    setError("");
+    if (num < 0) { setError("Quantity must be positive"); return; }
+    if (num > maxAffordable) { setError(`You can only afford ${maxAffordable} shares`); setQuantity(maxAffordable); return; }
     setQuantity(num);
   };
 
-  const handleConfirm = async (): Promise<void> => {
-    if (quantity < 1) {
-      setError('Quantity must be at least 1');
-      return;
-    }
-
-    if (totalCost > userBalance) {
-      setError('Insufficient balance');
-      return;
-    }
-
+  const handleConfirm = async () => {
+    if (quantity < 1) { setError("Quantity must be at least 1"); return; }
+    if (totalCost > userBalance) { setError("Insufficient balance"); return; }
     try {
       await onConfirm(quantity);
       setQuantity(1);
-      setError('');
+      setError("");
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : "An error occurred");
     }
   };
 
-  if (!isOpen) {
-    return null;
-  }
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-green-600 to-green-700 px-6 py-4 text-white">
-          <h2 className="text-2xl font-bold">Buy Stocks</h2>
-          <p className="text-green-100">{professorName}</p>
-        </div>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-md border-gain/30">
+        <DialogHeader>
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-2 w-2 rounded-full bg-gain animate-pulse" />
+            <DialogTitle className="text-gain font-bold">Buy Shares</DialogTitle>
+          </div>
+          <DialogDescription>{professorName}</DialogDescription>
+        </DialogHeader>
 
-        {/* Content */}
-        <div className="p-6 space-y-4">
-          {/* Price Info */}
-          <div>
-            <p className="text-sm text-gray-600 font-medium mb-1">Price per Share</p>
-            <p className="text-2xl font-bold text-green-600">${stockPrice.toFixed(2)}</p>
+        <div className="space-y-4 py-2">
+          <div className="rounded-lg bg-secondary p-4">
+            <p className="text-xs text-muted-foreground font-medium mb-1">Price per Share</p>
+            <p className="text-2xl font-mono font-bold text-gain">${stockPrice.toFixed(2)}</p>
           </div>
 
-          {/* Quantity Input */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Number of Shares
-            </label>
+            <label className="block text-sm font-medium text-foreground mb-2">Number of Shares</label>
             <input
               type="number"
               value={quantity}
               onChange={(e) => handleQuantityChange(e.target.value)}
-              min="1"
+              min={1}
               max={maxAffordable}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               disabled={isLoading}
+              className="w-full rounded-lg border border-border bg-muted px-4 py-2 font-mono text-foreground focus:ring-2 focus:ring-gain focus:border-transparent outline-none"
             />
-            <p className="text-xs text-gray-500 mt-1">Max affordable: {maxAffordable} shares</p>
+            <p className="text-xs text-muted-foreground mt-1">Max affordable: {maxAffordable} shares</p>
           </div>
 
-          {/* Cost Summary */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <div className="flex justify-between mb-2">
-              <span className="text-gray-600">Quantity</span>
-              <span className="font-semibold">{quantity} shares</span>
+          <div className="rounded-lg bg-secondary p-4 space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Quantity</span>
+              <span className="font-mono font-semibold">{quantity}</span>
             </div>
-            <div className="flex justify-between mb-2">
-              <span className="text-gray-600">Price per Share</span>
-              <span className="font-semibold">${stockPrice.toFixed(2)}</span>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Price per Share</span>
+              <span className="font-mono font-semibold">${stockPrice.toFixed(2)}</span>
             </div>
-            <div className="border-t pt-2 flex justify-between">
-              <span className="font-bold text-gray-800">Total Cost</span>
-              <span className={`text-lg font-bold ${
-                totalCost <= userBalance ? 'text-green-600' : 'text-red-600'
-              }`}>
+            <div className="border-t border-border pt-2 flex justify-between">
+              <span className="font-bold">Total Cost</span>
+              <span className={`font-mono font-bold text-lg ${totalCost <= userBalance ? "text-gain" : "text-loss"}`}>
                 ${totalCost.toFixed(2)}
               </span>
             </div>
           </div>
 
-          {/* Balance */}
-          <div className="bg-blue-50 p-3 rounded-lg">
+          <div className="rounded-lg bg-accent/10 p-3 space-y-1 text-sm">
             <div className="flex justify-between">
-              <span className="text-sm text-gray-700">Available Balance</span>
-              <span className="font-bold text-blue-600">${userBalance.toFixed(2)}</span>
+              <span className="text-muted-foreground">Available Balance</span>
+              <span className="font-mono font-bold text-accent">${userBalance.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between mt-1">
-              <span className="text-sm text-gray-700">After Purchase</span>
-              <span className={`font-bold ${
-                userBalance - totalCost >= 0 ? 'text-green-600' : 'text-red-600'
-              }`}>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">After Purchase</span>
+              <span className={`font-mono font-bold ${userBalance - totalCost >= 0 ? "text-gain" : "text-loss"}`}>
                 ${(userBalance - totalCost).toFixed(2)}
               </span>
             </div>
           </div>
 
-          {/* Error Message */}
           {error && (
-            <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm font-medium">
-              {error}
-            </div>
+            <div className="rounded-lg bg-loss/10 text-loss p-3 text-sm font-medium">{error}</div>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="border-t px-6 py-4 flex gap-3">
+        <DialogFooter className="gap-2 sm:gap-2">
           <button
             onClick={onClose}
             disabled={isLoading}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-secondary transition disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
             disabled={isLoading || totalCost > userBalance || quantity < 1}
-            className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition"
+            className="flex-1 rounded-lg bg-gain px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-gain/90 transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {isLoading ? 'Processing...' : 'Confirm Purchase'}
+            {isLoading ? "Processing…" : "Confirm Purchase"}
           </button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 
