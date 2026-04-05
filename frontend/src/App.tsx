@@ -1,16 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState, FC } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 
-export default function App() {
-  const [token, setToken] = useState(() => {
+interface User {
+  name: string;
+  email: string;
+  [key: string]: any;
+}
+
+const App: FC = () => {
+  const [token, setToken] = useState<string | null>(() => {
     return localStorage.getItem('token') || null;
   });
 
-  const [user, setUser] = useState(() => {
+  const [user, setUser] = useState<User | null>(() => {
     const stored = localStorage.getItem('user');
     return stored ? JSON.parse(stored) : null;
   });
@@ -42,4 +48,6 @@ export default function App() {
       </Routes>
     </BrowserRouter>
   );
-}
+};
+
+export default App;

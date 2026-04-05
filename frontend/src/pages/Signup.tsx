@@ -1,52 +1,60 @@
-import { useState } from 'react';
+import { useState, useCallback, FC } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 
-export default function Signup({ setToken, setUser }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [name, setName] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+interface SignupProps {
+  setToken: (token: string) => void;
+  setUser: (user: any) => void;
+}
+
+const Signup: FC<SignupProps> = ({ setToken, setUser }) => {
+  const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [confirmPassword, setConfirmPassword] = useState<string>('');
+  const [name, setName] = useState<string>('');
+  const [error, setError] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      setError('');
 
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const response = await axios.post('http://localhost:5000/api/auth/register', {
-        email,
-        password,
-        name,
-      });
-
-      if (response.data.success) {
-        setToken(response.data.token);
-        setUser(response.data.user);
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-        navigate('/dashboard');
+      if (password !== confirmPassword) {
+        setError('Passwords do not match');
+        return;
       }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Signup failed');
-    } finally {
-      setLoading(false);
-    }
-  };
+
+      if (password.length < 6) {
+        setError('Password must be at least 6 characters');
+        return;
+      }
+
+      setLoading(true);
+
+      try {
+        const response = await axios.post('http://localhost:5000/api/auth/register', {
+          email,
+          password,
+          name,
+        });
+
+        if (response.data.success) {
+          setToken(response.data.token);
+          setUser(response.data.user);
+          localStorage.setItem('token', response.data.token);
+          localStorage.setItem('user', JSON.stringify(response.data.user));
+          navigate('/dashboard');
+        }
+      } catch (err: any) {
+        setError(err.response?.data?.message || 'Signup failed');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [email, password, confirmPassword, name, setToken, setUser, navigate]
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">
@@ -73,6 +81,7 @@ export default function Signup({ setToken, setUser }) {
               onChange={(e) => setName(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               placeholder="John Doe"
+              required
             />
           </div>
 
@@ -121,7 +130,7 @@ export default function Signup({ setToken, setUser }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-semibold py-2 rounded-lg transition duration-200"
+            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-semibold transition duration-200"
           >
             {loading ? 'Creating account...' : 'Sign Up'}
           </button>
@@ -130,10 +139,12 @@ export default function Signup({ setToken, setUser }) {
         <p className="text-center text-gray-600 mt-6">
           Already have an account?{' '}
           <Link to="/login" className="text-indigo-600 hover:text-indigo-700 font-semibold">
-            Login
+            Log in
           </Link>
         </p>
       </div>
     </div>
   );
-}
+};
+
+export default Signup;

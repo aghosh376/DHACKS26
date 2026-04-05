@@ -1,9 +1,22 @@
+import { FC } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-export default function Dashboard({ user, setToken, setUser }) {
+interface User {
+  name: string;
+  email: string;
+  [key: string]: any;
+}
+
+interface DashboardProps {
+  user: User | null;
+  setToken: (token: string | null) => void;
+  setUser: (user: User | null) => void;
+}
+
+const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }: DashboardProps) => {
   const navigate = useNavigate();
 
-  const handleLogout = () => {
+  const handleLogout = (): void => {
     setToken(null);
     setUser(null);
     localStorage.removeItem('token');
@@ -100,4 +113,6 @@ export default function Dashboard({ user, setToken, setUser }) {
       </div>
     </div>
   );
-}
+};
+
+export default Dashboard;

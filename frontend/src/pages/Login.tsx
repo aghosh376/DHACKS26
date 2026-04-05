@@ -1,38 +1,46 @@
-import { useState } from 'react';
+import { useState, useCallback, FC } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 
-export default function Login({ setToken, setUser }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+interface LoginProps {
+  setToken: (token: string) => void;
+  setUser: (user: any) => void;
+}
+
+const Login: FC<LoginProps> = ({ setToken, setUser }) => {
+  const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [error, setError] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      setError('');
+      setLoading(true);
 
-    try {
-      const response = await axios.post('http://localhost:5000/api/auth/login', {
-        email,
-        password,
-      });
+      try {
+        const response = await axios.post('http://localhost:5000/api/auth/login', {
+          email,
+          password,
+        });
 
-      if (response.data.success) {
-        setToken(response.data.token);
-        setUser(response.data.user);
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-        navigate('/dashboard');
+        if (response.data.success) {
+          setToken(response.data.token);
+          setUser(response.data.user);
+          localStorage.setItem('token', response.data.token);
+          localStorage.setItem('user', JSON.stringify(response.data.user));
+          navigate('/dashboard');
+        }
+      } catch (err: any) {
+        setError(err.response?.data?.message || 'Login failed');
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [email, password, setToken, setUser, navigate]
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">
@@ -79,7 +87,7 @@ export default function Login({ setToken, setUser }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-semibold py-2 rounded-lg transition duration-200"
+            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-semibold transition duration-200"
           >
             {loading ? 'Logging in...' : 'Login'}
           </button>
@@ -94,4 +102,6 @@ export default function Login({ setToken, setUser }) {
       </div>
     </div>
   );
-}
+};
+
+export default Login;
