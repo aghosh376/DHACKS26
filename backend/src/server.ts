@@ -5,6 +5,7 @@ import connectDB from './config/db.js';
 import errorHandler from './middleware/errorHandler.js';
 import Stock from './models/stock.js';
 import { applyMarketEntropy, updatePriceHistory, calculatePercentChange } from './utils/marketEngine.js';
+import { startDailyCron } from './scripts/dailyCronJob.js';
 
 dotenv.config();
 
@@ -98,6 +99,9 @@ const startMarketEntropyEngine = async (): Promise<void> => {
 setTimeout(() => {
   startMarketEntropyEngine().catch(err => console.error('Entropy engine error:', err));
 }, 1000);
+
+// Start daily 12am cron (RMP + Reddit scrape → score + price updates)
+startDailyCron();
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

@@ -5,6 +5,9 @@ export interface IProfessorDocument extends Document {
   name: string;
   department: string;
   currScore?: number;
+  rmpScore?: number;
+  redditScore?: number;
+  overallScore?: number;
   pastSentiments: Array<{ score: number }>;
   email?: string;
   officeLocation?: string;
@@ -36,6 +39,9 @@ const professorSchema = new Schema<IProfessorDocument>(
       index: true,
     },
     currScore: Number,
+    rmpScore: Number,
+    redditScore: Number,
+    overallScore: Number,
     pastSentiments: [
       {
         score: Number,

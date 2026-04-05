@@ -18,19 +18,34 @@ export async function scrapeRateMyProf(key) {
   });
 
   const task = `
-    Go to https://www.ratemyprofessors.com/search/professors/1079?q=*
-    This page lists UC San Diego (UCSD) professors on RateMyProfessors.
-    For each professor card on the page, extract:
-      - Their full name (first and last name)
-      - Their overall rating (a decimal number like 4.5 shown on each card).
-        If a card shows "N/A" or no numeric rating, use null for that professor's rating.
-    After collecting all professors on the first page, click the button to load more
-    results (labeled "Show More" or similar). Repeat until you have at least 100
-    professors total or no more results exist.
-    Return all collected professors as JSON matching the provided schema.
+    Step 1: Go to https://cse.ucsd.edu/people/faculty-profiles/faculty
+    Scroll to the bottom. Collect the full name (first + last) of every faculty member.
+
+    Step 2: For each faculty name:
+      a. Navigate to https://www.ratemyprofessors.com/search/professors/1079?q=<NAME>
+         (URL-encode the name).
+      b. Find the card that matches BOTH the name AND belongs to UC San Diego (UCSD).
+         They may appear under "Computer Science", "Engineering", or "Mathematics" on RMP.
+         If no UCSD match exists, skip this professor — do NOT pick someone from a different
+         university even if the name matches.
+      c. Extract their overall rating shown on the card (e.g. 4.5).
+         If it shows "N/A" or no number, use null.
+
+    Step 3: Return all collected professors as JSON matching the provided schema.
+
+    TIMEOUT SAFETY: If 15 minutes have elapsed, return whatever has been collected
+    so far in the proper schema format.
   `.trim();
 
-  const result = await client.run(task, { schema: rmpSchema });
+  const FIFTEEN_MINUTES = 15 * 60 * 1000;
+  const timeout = new Promise((resolve) =>
+    setTimeout(() => resolve({ output: { professors: [] } }), FIFTEEN_MINUTES)
+  );
+
+  const result = await Promise.race([
+    client.run(task, { schema: rmpSchema }),
+    timeout,
+  ]);
 
   const ratingMap = {};
   for (const prof of result.output.professors) {
@@ -125,7 +140,7 @@ export async function scrape5YearsBackReddit(key) {
 
 
 
-export async function scrapeRMPHistorical(key) {
+async function runRMPHistoricalAgent(key, lastNameStart, lastNameEnd) {
   process.env.BROWSER_USE_API_KEY = key;
   const client = new BrowserUse();
 
@@ -133,6 +148,7 @@ export async function scrapeRMPHistorical(key) {
     professors: z.array(
       z.object({
         name: z.string(),
+        department: z.string(),  // department label as shown on RMP
         reviews: z.array(
           z.object({
             date: z.string(),    // "YYYY-MM-DD"
@@ -145,23 +161,32 @@ export async function scrapeRMPHistorical(key) {
 
   const task = `
     Step 1: Go to https://cse.ucsd.edu/people/faculty-profiles/faculty
-    Collect the full name (first + last) of every faculty member listed on the page.
+    Scroll all the way to the bottom to ensure all faculty are loaded.
+    Collect the full name (first + last) of EVERY faculty member on the page.
 
-    Step 2: For each faculty name:
+    Step 2: From that list, keep ONLY professors whose LAST NAME starts with a
+    letter from ${lastNameStart} to ${lastNameEnd} (inclusive, case-insensitive).
+
+    Step 3: For each professor in your filtered list:
       a. Navigate to https://www.ratemyprofessors.com/search/professors/1079?q=<NAME>
          (URL-encode the name, e.g. "Pavel Pevzner" → "Pavel+Pevzner").
-      b. Find and click the professor card whose name matches exactly.
-         If no exact match exists, skip this faculty member.
-      c. On their profile page, scroll to the reviews section.
-         Click "Load More Ratings" repeatedly until all reviews are visible.
-      d. For each review extract:
-         - The date it was posted, formatted as YYYY-MM-DD.
-         - The overall quality rating (a number from 1.0 to 5.0).
+      b. The search results may show professors from different universities and departments.
+         Find the card that matches BOTH the name AND belongs to UC San Diego (UCSD).
+         They may be listed under "Computer Science", "Engineering", or "Mathematics" on RMP.
+         If no UCSD match exists, skip this professor entirely — do NOT pick a match from
+         a different university even if the name is identical.
+      c. Note the department label shown on their UCSD RMP card (e.g. "Computer Science",
+         "Engineering", "Mathematics"). This is their department.
+      d. Click their profile. Scroll to the reviews section.
+         Click "Load More Ratings" repeatedly until no more button appears.
+      e. For each visible review extract:
+         - The date posted, formatted as YYYY-MM-DD.
+         - The overall quality rating (1.0 to 5.0).
 
-    Step 3: Return collected data as JSON matching the provided schema.
-    Only include faculty members who have at least one review.
+    Step 4: Return collected data as JSON matching the provided schema.
+    Only include professors who have at least one review.
 
-    STOP CONDITION: Return immediately once all faculty have been processed.
+    STOP CONDITION: Return once all professors in your assigned range are processed.
     TIMEOUT SAFETY: If 30 minutes have elapsed, return whatever has been collected
     so far in the proper schema format.
   `.trim();
@@ -179,17 +204,32 @@ export async function scrapeRMPHistorical(key) {
     if (sessionId) await client.sessions.stop(sessionId);
   } catch (_) {}
 
-  const result = {};
+  const reviews = {};
+  const departments = {};
   for (const prof of raw.output.professors) {
     if (!prof.reviews || prof.reviews.length === 0) continue;
-    result[prof.name] = {};
+    reviews[prof.name] = {};
+    departments[prof.name] = prof.department || 'Computer Science & Engineering';
     for (const review of prof.reviews) {
-      if (!result[prof.name][review.date]) result[prof.name][review.date] = [];
-      result[prof.name][review.date].push(review.rating);
+      if (!reviews[prof.name][review.date]) reviews[prof.name][review.date] = [];
+      reviews[prof.name][review.date].push(review.rating);
     }
   }
 
-  return result;
+  return { reviews, departments };
+}
+
+export async function scrapeRMPHistorical(key) {
+  const [a, b, c] = await Promise.all([
+    runRMPHistoricalAgent(key, "A", "H"),
+    runRMPHistoricalAgent(key, "I", "P"),
+    runRMPHistoricalAgent(key, "Q", "Z"),
+  ]);
+
+  return {
+    reviews: { ...a.reviews, ...b.reviews, ...c.reviews },
+    departments: { ...a.departments, ...b.departments, ...c.departments },
+  };
 }
 
 async function runRedditHistoricalAgent(key, lastNameStart, lastNameEnd) {
