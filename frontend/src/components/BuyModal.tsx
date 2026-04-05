@@ -41,8 +41,10 @@ const BuyModal: FC<BuyModalProps> = ({
   const [quantity, setQuantity] = useState(1);
   const [error, setError] = useState("");
 
-  const totalCost = quantity * stockPrice;
-  const maxAffordable = Math.floor(userBalance / stockPrice);
+  const safeStockPrice = Number.isFinite(stockPrice) ? stockPrice : 0;
+  const safeUserBalance = Number.isFinite(userBalance) ? userBalance : 0;
+  const totalCost = quantity * safeStockPrice;
+  const maxAffordable = safeStockPrice > 0 ? Math.floor(safeUserBalance / safeStockPrice) : 0;
 
   const handleQuantityChange = (value: string) => {
     const num = parseInt(value) || 0;
@@ -54,7 +56,7 @@ const BuyModal: FC<BuyModalProps> = ({
 
   const handleConfirm = async () => {
     if (quantity < 1) { setError("Quantity must be at least 1"); return; }
-    if (totalCost > userBalance) { setError("Insufficient balance"); return; }
+    if (totalCost > safeUserBalance) { setError("Insufficient balance"); return; }
     try {
       await onConfirm(quantity);
       setQuantity(1);

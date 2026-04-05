@@ -1,6 +1,8 @@
 import { FC, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { ErrorBoundary } from "react-error-boundary";
+import { z } from "zod";
 import ProfessorCard from "@/components/ProfessorCard";
 import BuyModal from "@/components/BuyModal";
 import SellModal from "@/components/SellModal";
@@ -28,12 +30,72 @@ interface BackendProfessor {
   department: string;
   email?: string;
   imageUrl?: string;
+  avatar?: string;
   currScore?: number;
   overallScore?: number;
   rmpScore?: number;
   setScore?: number;
   redditScore?: number;
+  rating?: number | null;
 }
+
+const BackendProfessorSchema = z.object({
+  _id: z.string(),
+  name: z.string().default("Unknown"),
+  department: z.string().default("General"),
+  email: z.string().optional(),
+  imageUrl: z.string().optional(),
+  avatar: z.string().default("👨‍🏫"),
+  currScore: z.number().nullable().optional().default(null),
+  overallScore: z.number().nullable().optional().default(null),
+  rmpScore: z.number().nullable().optional().default(null),
+  setScore: z.number().nullable().optional().default(null),
+  redditScore: z.number().nullable().optional().default(null),
+  rating: z.number().nullable().optional().default(null),
+}).passthrough();
+
+const BackendPricePointSchema = z.union([
+  z.object({
+    time: z.union([z.string(), z.number()]).optional(),
+    price: z.number().optional(),
+  }).passthrough(),
+  z.number(),
+]).default([]);
+
+const BackendStockSchema = z.object({
+  _id: z.string(),
+  professorId: BackendProfessorSchema,
+  currentPrice: z.number().nonnegative().default(0),
+  percentChange24h: z.number().default(0),
+  volume24h: z.number().default(0),
+  marketCap: z.number().default(0),
+  priceHistory: z.array(BackendPricePointSchema).default([]),
+}).passthrough();
+
+const BackendStocksResponseSchema = z.object({
+  success: z.boolean().optional(),
+  data: z.array(BackendStockSchema).default([]),
+}).passthrough();
+
+const MarketErrorFallback = ({
+  error,
+  resetErrorBoundary,
+}: {
+  error: Error;
+  resetErrorBoundary: () => void;
+}) => (
+  <div className="rounded-3xl border border-border bg-slate-950/90 p-6 text-center text-slate-100 shadow-xl">
+    <p className="text-lg font-semibold text-white">Market data temporarily unavailable</p>
+    <p className="mt-2 text-sm text-slate-400">We’re having trouble loading live professor stock data.</p>
+    <button
+      onClick={resetErrorBoundary}
+      className="mt-4 inline-flex rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15 transition"
+    >
+      Retry
+    </button>
+    <pre className="sr-only">{error.message}</pre>
+  </div>
+);
 
 interface DashboardProps {
   user: User | null;
@@ -68,6 +130,7 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
     const fetchInitialData = async () => {
       try {
         setLoading(true);
+        setError("");
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -75,10 +138,21 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
         const stocksRes = await fetch("/api/stocks", { headers });
         if (!stocksRes.ok) throw new Error("Failed to fetch stocks");
         const stocksData = await stocksRes.json();
-        setBackendStocks(stocksData.data || []);
+        const parsed = BackendStocksResponseSchema.safeParse(stocksData);
+        if (!parsed.success) {
+          console.error("Invalid stock payload:", parsed.error.format());
+          setBackendStocks([]);
+          setUseBackend(false);
+          setError("Market data temporarily unavailable");
+          return;
+        }
+        setBackendStocks(parsed.data.data);
         setUseBackend(true);
-      } catch {
+      } catch (fetchError) {
+        console.error("Stock fetch error:", fetchError);
         setUseBackend(false);
+        setBackendStocks([]);
+        setError("Market data temporarily unavailable");
       } finally {
         setLoading(false);
       }
@@ -98,10 +172,15 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
         const stocksRes = await fetch("/api/stocks", { headers });
         if (stocksRes.ok) {
           const stocksData = await stocksRes.json();
-          setBackendStocks(stocksData.data || []);
+          const parsed = BackendStocksResponseSchema.safeParse(stocksData);
+          if (parsed.success) {
+            setBackendStocks(parsed.data.data);
+          } else {
+            console.debug("Invalid refresh payload:", parsed.error.format());
+          }
         }
-      } catch {
-        console.debug("Stock price refresh error");
+      } catch (refreshError) {
+        console.debug("Stock price refresh error", refreshError);
       }
     }, 10_000);
     return () => clearInterval(interval);
@@ -127,22 +206,22 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
     return Array.from(departments).sort();
   };
 
-  const buildProfessor = (professorData: any): Professor => ({
+  const buildProfessor = (professorData: BackendProfessor): Professor => ({
     id: professorData._id,
     ticker: (professorData.name || "").split(" ").pop()?.substring(0, 4).toUpperCase() || "PROF",
     name: professorData.name || "Unknown",
     department: professorData.department || "N/A",
     email: professorData.email,
-    avatar: "👨‍🏫", // Lovable default avatar
-    sentiment: Math.round((professorData.currScore || 3) * 20),
-    rating: professorData.currScore || 3,
+    avatar: professorData.avatar || "👨‍🏫",
+    sentiment: Math.round((professorData.currScore ?? 3) * 20),
+    rating: professorData.rating ?? professorData.currScore ?? 3,
     difficulty: 3,
     tags: [],
     // Extended properties for modals
-    overallScore: professorData.overallScore,
-    rmpScore: professorData.rmpScore,
-    setScore: professorData.setScore,
-    redditScore: professorData.redditScore,
+    overallScore: professorData.overallScore ?? undefined,
+    rmpScore: professorData.rmpScore ?? undefined,
+    setScore: professorData.setScore ?? undefined,
+    redditScore: professorData.redditScore ?? undefined,
   } as any);
 
   // ─── Ticker map for TickerBar ─────────────────────────
@@ -448,7 +527,18 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
     }
     return localProfessors.map((p) => ({
       professor: p,
-      stock: localStocks.get(p.id)!,
+      stock: localStocks.get(p.id) ?? {
+        professorId: p.id,
+        price: 0,
+        previousPrice: 0,
+        change: 0,
+        changePercent: 0,
+        history: [],
+        volume: 0,
+        high: 0,
+        low: 0,
+        marketCap: 0,
+      },
       profBackendId: p.id,
     }));
   })();
@@ -629,37 +719,41 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
                 </p>
               </div>
             ) : (
-              <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                {filteredItems.map((item, i) => (
-                  <motion.div
-                    key={item.profBackendId}
-                    layout
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.03 }}
-                  >
-                    <ProfessorCard
-                      professor={item.professor}
-                      stock={item.stock}
-                      userShares={getUserShares(item.profBackendId)}
-                      userBalance={balance}
-                      onBuyClick={() => handleBuyClick(item.profBackendId, item.stock)}
-                      onSellClick={() => handleSellClick(item.profBackendId, item.stock, getUserShares(item.profBackendId))}
-                    />
-                  </motion.div>
-                ))}
-              </motion.div>
+              <ErrorBoundary FallbackComponent={MarketErrorFallback} onReset={() => setError("")}>
+                <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {filteredItems.map((item, i) => (
+                    <motion.div
+                      key={item.profBackendId}
+                      layout
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.03 }}
+                    >
+                      <ProfessorCard
+                        professor={item.professor}
+                        stock={item.stock}
+                        userShares={getUserShares(item.profBackendId)}
+                        userBalance={balance}
+                        onBuyClick={() => handleBuyClick(item.profBackendId, item.stock)}
+                        onSellClick={() => handleSellClick(item.profBackendId, item.stock, getUserShares(item.profBackendId))}
+                      />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              </ErrorBoundary>
             )}
           </div>
 
           {/* Sidebar */}
           <div className="lg:w-80 xl:w-96">
-            <PortfolioPanel
-              portfolio={portfolio}
-              stocks={tickerStocksMap}
-              totalValue={portfolioValue}
-              totalPL={totalPL}
-            />
+            <ErrorBoundary FallbackComponent={MarketErrorFallback} onReset={() => setError("")}>
+              <PortfolioPanel
+                portfolio={portfolio}
+                stocks={tickerStocksMap}
+                totalValue={portfolioValue}
+                totalPL={totalPL}
+              />
+            </ErrorBoundary>
           </div>
         </div>
       </main>
