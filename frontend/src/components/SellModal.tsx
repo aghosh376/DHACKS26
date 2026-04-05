@@ -9,6 +9,10 @@ interface SellModalProps {
   averageBuyPrice: number;
   isOpen: boolean;
   isLoading: boolean;
+  overallScore?: number;
+  rmpScore?: number;
+  setScore?: number;
+  redditScore?: number;
   onClose: () => void;
   onConfirm: (quantity: number) => Promise<void>;
 }
@@ -21,6 +25,10 @@ const SellModal: FC<SellModalProps> = ({
   averageBuyPrice,
   isOpen,
   isLoading,
+  overallScore,
+  rmpScore,
+  setScore,
+  redditScore,
   onClose,
   onConfirm,
 }) => {
@@ -102,6 +110,39 @@ const SellModal: FC<SellModalProps> = ({
                 Your Average Buy Price: ${averageBuyPrice.toFixed(2)}
               </p>
             </div>
+
+            {/* Professor Scores */}
+            {(overallScore != null || rmpScore != null || setScore != null || redditScore != null) && (
+              <div className="bg-indigo-50 p-4 rounded-lg">
+                <p className="text-sm font-semibold text-indigo-800 mb-2">Professor Scores</p>
+                <div className="space-y-1">
+                  {overallScore != null && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Overall</span>
+                      <span className="font-bold text-indigo-700">{overallScore.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {rmpScore != null && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">RMP</span>
+                      <span className="font-semibold text-gray-800">{rmpScore.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {setScore != null && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">SET</span>
+                      <span className="font-semibold text-gray-800">{setScore.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {redditScore != null && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Reddit Sentiment</span>
+                      <span className="font-semibold text-gray-800">{redditScore.toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Quantity Input */}
             <div>

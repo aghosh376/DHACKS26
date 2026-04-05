@@ -25,7 +25,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     const skip = (page - 1) * limit;
 
     const stocks = await Stock.find()
-      .populate('professorId', 'name department imageUrl email')
+      .populate('professorId', 'name department imageUrl email currScore rmpScore redditScore overallScore')
       .sort(sort)
       .limit(limit)
       .skip(skip)

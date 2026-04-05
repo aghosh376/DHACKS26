@@ -33,6 +33,10 @@ interface Professor {
   email?: string;
   imageUrl?: string;
   currScore?: number;
+  overallScore?: number;
+  rmpScore?: number;
+  setScore?: number;
+  redditScore?: number;
 }
 
 interface DashboardProps {
@@ -160,37 +164,32 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }: DashboardPro
     });
   };
 
+  const buildProfessor = (professorData: any): Professor => ({
+    _id: professorData._id,
+    name: professorData.name || 'Unknown',
+    department: professorData.department || 'N/A',
+    email: professorData.email,
+    imageUrl: professorData.imageUrl,
+    currScore: professorData.currScore,
+    overallScore: professorData.overallScore,
+    rmpScore: professorData.rmpScore,
+    setScore: professorData.setScore,
+    redditScore: professorData.redditScore,
+  });
+
   const handleBuyClick = (professorId: string, stock: Stock): void => {
-    // Find professor from stock data
     const professorData = stock.professorId as any;
     if (professorData && professorData._id) {
-      const professor: Professor = {
-        _id: professorData._id,
-        name: professorData.name || 'Unknown',
-        department: professorData.department || 'N/A',
-        email: professorData.email,
-        imageUrl: professorData.imageUrl,
-        currScore: professorData.currScore,
-      };
-      setSelectedProfessor(professor);
+      setSelectedProfessor(buildProfessor(professorData));
       setSelectedStock(stock);
       setBuyModalOpen(true);
     }
   };
 
   const handleSellClick = (professorId: string, stock: Stock, shares: number): void => {
-    // Find professor from stock data
     const professorData = stock.professorId as any;
     if (professorData && professorData._id) {
-      const professor: Professor = {
-        _id: professorData._id,
-        name: professorData.name || 'Unknown',
-        department: professorData.department || 'N/A',
-        email: professorData.email,
-        imageUrl: professorData.imageUrl,
-        currScore: professorData.currScore,
-      };
-      setSelectedProfessor(professor);
+      setSelectedProfessor(buildProfessor(professorData));
       setSelectedStock(stock);
       setSelectedProfessorShares(shares);
       setSellModalOpen(true);
@@ -484,14 +483,7 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }: DashboardPro
                 const professorData = stock.professorId as any;
                 if (!professorData || !professorData._id) return null;
 
-                const professor: Professor = {
-                  _id: professorData._id,
-                  name: professorData.name || 'Unknown',
-                  department: professorData.department || 'N/A',
-                  email: professorData.email,
-                  imageUrl: professorData.imageUrl,
-                  currScore: professorData.currScore,
-                };
+                const professor: Professor = buildProfessor(professorData);
 
                 const userShares = getUserShares(professorData._id);
 
@@ -521,6 +513,10 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }: DashboardPro
           userBalance={user.balance || 0}
           isOpen={buyModalOpen}
           isLoading={transactionLoading}
+          overallScore={selectedProfessor.overallScore}
+          rmpScore={selectedProfessor.rmpScore}
+          setScore={selectedProfessor.setScore}
+          redditScore={selectedProfessor.redditScore}
           onClose={() => {
             setBuyModalOpen(false);
             setSelectedProfessor(null);
@@ -540,6 +536,10 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }: DashboardPro
           averageBuyPrice={getUserAverageBuyPrice(selectedProfessor._id)}
           isOpen={sellModalOpen}
           isLoading={transactionLoading}
+          overallScore={selectedProfessor.overallScore}
+          rmpScore={selectedProfessor.rmpScore}
+          setScore={selectedProfessor.setScore}
+          redditScore={selectedProfessor.redditScore}
           onClose={() => {
             setSellModalOpen(false);
             setSelectedProfessor(null);
