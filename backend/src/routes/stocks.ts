@@ -25,7 +25,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     const skip = (page - 1) * limit;
 
     const stocks = await Stock.find()
-      .populate('professorId', 'name department imageUrl email')
+      .populate('professorId', 'name department imageUrl email currScore rmpScore redditScore overallScore')
       .sort(sort)
       .limit(limit)
       .skip(skip)
@@ -211,11 +211,20 @@ router.post('/:professorId/buy', authenticate, async (req: Request, res: Respons
 
     const percentChange24h = calculatePercentChange(oldPrice, newPrice);
     stock.percentChange24h = percentChange24h;
-    stock.percentChange7d = (stock.percentChange7d || 0) + percentChange24h;
-    stock.percentChange1m = (stock.percentChange1m || 0) + percentChange24h;
-    stock.percentChange6m = (stock.percentChange6m || 0) + percentChange24h;
 
-    stock. priceHistory = updatePriceHistory(stock.priceHistory, newPrice);
+    // 7d/1m/6m changes are recalculated from price history relative to the
+    // historical price at each cutoff, not accumulated per-transaction.
+    const now = Date.now();
+    const priceAt = (msBack: number) => {
+      const cutoff = now - msBack;
+      const entry = [...stock.priceHistory].reverse().find((e) => new Date(e.date).getTime() <= cutoff);
+      return entry?.price ?? stock.priceHistory[0]?.price ?? newPrice;
+    };
+    stock.percentChange7d = calculatePercentChange(priceAt(7 * 86400000), newPrice);
+    stock.percentChange1m = calculatePercentChange(priceAt(30 * 86400000), newPrice);
+    stock.percentChange6m = calculatePercentChange(priceAt(180 * 86400000), newPrice);
+
+    stock.priceHistory = updatePriceHistory(stock.priceHistory, newPrice);
     stock.lastUpdated = new Date();
 
     user.balance -= totalCost;
@@ -363,9 +372,16 @@ router.post('/:professorId/sell', authenticate, async (req: Request, res: Respon
 
     const percentChange24h = calculatePercentChange(oldPrice, newPrice);
     stock.percentChange24h = percentChange24h;
-    stock.percentChange7d = (stock.percentChange7d || 0) + percentChange24h;
-    stock.percentChange1m = (stock.percentChange1m || 0) + percentChange24h;
-    stock.percentChange6m = (stock.percentChange6m || 0) + percentChange24h;
+
+    const now = Date.now();
+    const priceAt = (msBack: number) => {
+      const cutoff = now - msBack;
+      const entry = [...stock.priceHistory].reverse().find((e) => new Date(e.date).getTime() <= cutoff);
+      return entry?.price ?? stock.priceHistory[0]?.price ?? newPrice;
+    };
+    stock.percentChange7d = calculatePercentChange(priceAt(7 * 86400000), newPrice);
+    stock.percentChange1m = calculatePercentChange(priceAt(30 * 86400000), newPrice);
+    stock.percentChange6m = calculatePercentChange(priceAt(180 * 86400000), newPrice);
 
     stock.priceHistory = updatePriceHistory(stock.priceHistory, newPrice);
     stock.lastUpdated = new Date();

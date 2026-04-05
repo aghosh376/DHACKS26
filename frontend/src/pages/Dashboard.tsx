@@ -27,6 +27,10 @@ interface BackendProfessor {
   email?: string;
   imageUrl?: string;
   currScore?: number;
+  overallScore?: number;
+  rmpScore?: number;
+  setScore?: number;
+  redditScore?: number;
 }
 
 interface DashboardProps {
@@ -121,6 +125,24 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
     return Array.from(departments).sort();
   };
 
+  const buildProfessor = (professorData: any): Professor => ({
+    id: professorData._id,
+    ticker: (professorData.name || "").split(" ").pop()?.substring(0, 4).toUpperCase() || "PROF",
+    name: professorData.name || "Unknown",
+    department: professorData.department || "N/A",
+    email: professorData.email,
+    avatar: "👨‍🏫", // Lovable default avatar
+    sentiment: Math.round((professorData.currScore || 3) * 20),
+    rating: professorData.currScore || 3,
+    difficulty: 3,
+    tags: [],
+    // Extended properties for modals
+    overallScore: professorData.overallScore,
+    rmpScore: professorData.rmpScore,
+    setScore: professorData.setScore,
+    redditScore: professorData.redditScore,
+  } as any);
+
   // ─── Ticker map for TickerBar ─────────────────────────
   const tickerStocksMap = (() => {
     if (useBackend) {
@@ -132,7 +154,7 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
           professorId: prof._id,
           price: s.currentPrice,
           previousPrice: s.currentPrice,
-          change: 0,
+          change: s.percentChange24h >= 0 ? 0.01 : -0.01,
           changePercent: s.percentChange24h,
           history: [],
           volume: s.volume24h,
@@ -147,11 +169,11 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
   })();
 
   // ─── Buy/Sell click handlers ──────────────────────────
-  const handleBuyClick = (professorId: string) => {
+  const handleBuyClick = (professorId: string, stock: any) => {
     if (useBackend) {
-      const stock = backendStocks.find((s) => (s.professorId as any)?._id === professorId);
-      if (!stock) return;
-      const prof = stock.professorId as any;
+      const backendStock = backendStocks.find((s) => (s.professorId as any)?._id === professorId);
+      if (!backendStock) return;
+      const prof = backendStock.professorId as any;
       setSelectedProfessor({
         _id: prof._id,
         name: prof.name || "Unknown",
@@ -159,8 +181,12 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
         email: prof.email,
         imageUrl: prof.imageUrl,
         currScore: prof.currScore,
+        overallScore: prof.overallScore,
+        rmpScore: prof.rmpScore,
+        setScore: prof.setScore,
+        redditScore: prof.redditScore,
       });
-      setSelectedBackendStock(stock);
+      setSelectedBackendStock(backendStock);
       setBuyModalOpen(true);
     } else {
       setSelectedLocalProfId(professorId);
@@ -168,12 +194,12 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
     }
   };
 
-  const handleSellClick = (professorId: string) => {
-    const shares = getUserShares(professorId);
+  const handleSellClick = (professorId: string, stock: any, shares: number) => {
+    const userShares = getUserShares(professorId);
     if (useBackend) {
-      const stock = backendStocks.find((s) => (s.professorId as any)?._id === professorId);
-      if (!stock) return;
-      const prof = stock.professorId as any;
+      const backendStock = backendStocks.find((s) => (s.professorId as any)?._id === professorId);
+      if (!backendStock) return;
+      const prof = backendStock.professorId as any;
       setSelectedProfessor({
         _id: prof._id,
         name: prof.name || "Unknown",
@@ -181,13 +207,17 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
         email: prof.email,
         imageUrl: prof.imageUrl,
         currScore: prof.currScore,
+        overallScore: prof.overallScore,
+        rmpScore: prof.rmpScore,
+        setScore: prof.setScore,
+        redditScore: prof.redditScore,
       });
-      setSelectedBackendStock(stock);
-      setSelectedProfessorShares(shares);
+      setSelectedBackendStock(backendStock);
+      setSelectedProfessorShares(userShares);
       setSellModalOpen(true);
     } else {
       setSelectedLocalProfId(professorId);
-      setSelectedProfessorShares(shares);
+      setSelectedProfessorShares(userShares);
       setSellModalOpen(true);
     }
   };
@@ -379,17 +409,7 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
         .map((s) => {
           const p = s.professorId as any;
           if (!p?._id) return null;
-          const professor: Professor = {
-            id: p._id,
-            ticker: (p.name || "").split(" ").pop()?.substring(0, 4).toUpperCase() || "PROF",
-            name: p.name || "Unknown",
-            department: p.department || "N/A",
-            avatar: "👨‍🏫",
-            sentiment: Math.round((p.currScore || 3) * 20),
-            rating: p.currScore || 3,
-            difficulty: 3,
-            tags: [],
-          };
+          const professor: Professor = buildProfessor(p);
           const stock: StockState = {
             professorId: p._id,
             price: s.currentPrice,
@@ -454,6 +474,12 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
   const getModalAvgBuy = () => {
     const id = useBackend ? selectedProfessor?._id : selectedLocalProfId;
     return id ? getUserAverageBuyPrice(id) : 0;
+  };
+
+  const getModalProfId = () => {
+     if (useBackend && selectedProfessor) return selectedProfessor._id;
+     if (selectedLocalProfId) return selectedLocalProfId;
+     return "";
   };
 
   // ─── Loading states ──────────────────────────────────
@@ -597,8 +623,8 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
                       stock={item.stock}
                       userShares={getUserShares(item.profBackendId)}
                       userBalance={balance}
-                      onBuyClick={handleBuyClick}
-                      onSellClick={handleSellClick}
+                      onBuyClick={() => handleBuyClick(item.profBackendId, item.stock)}
+                      onSellClick={() => handleSellClick(item.profBackendId, item.stock, getUserShares(item.profBackendId))}
                     />
                   </motion.div>
                 ))}
@@ -619,27 +645,41 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
       </main>
 
       {/* Buy Modal */}
-      <BuyModal
-        professorName={getModalName()}
-        stockPrice={getModalPrice()}
-        userBalance={balance}
-        isOpen={buyModalOpen}
-        isLoading={transactionLoading}
-        onClose={closeModals}
-        onConfirm={handleBuyConfirm}
-      />
+      {buyModalOpen && (
+         <BuyModal
+           professorId={getModalProfId()}
+           professorName={getModalName()}
+           stockPrice={getModalPrice()}
+           userBalance={balance}
+           isOpen={buyModalOpen}
+           isLoading={transactionLoading}
+           overallScore={selectedProfessor?.overallScore}
+           rmpScore={selectedProfessor?.rmpScore}
+           setScore={selectedProfessor?.setScore}
+           redditScore={selectedProfessor?.redditScore}
+           onClose={closeModals}
+           onConfirm={handleBuyConfirm}
+         />
+      )}
 
       {/* Sell Modal */}
-      <SellModal
-        professorName={getModalName()}
-        stockPrice={getModalPrice()}
-        userShares={selectedProfessorShares}
-        averageBuyPrice={getModalAvgBuy()}
-        isOpen={sellModalOpen}
-        isLoading={transactionLoading}
-        onClose={closeModals}
-        onConfirm={handleSellConfirm}
-      />
+      {sellModalOpen && (
+         <SellModal
+           professorId={getModalProfId()}
+           professorName={getModalName()}
+           stockPrice={getModalPrice()}
+           userShares={selectedProfessorShares}
+           averageBuyPrice={getModalAvgBuy()}
+           isOpen={sellModalOpen}
+           isLoading={transactionLoading}
+           overallScore={selectedProfessor?.overallScore}
+           rmpScore={selectedProfessor?.rmpScore}
+           setScore={selectedProfessor?.setScore}
+           redditScore={selectedProfessor?.redditScore}
+           onClose={closeModals}
+           onConfirm={handleSellConfirm}
+         />
+      )}
     </div>
   );
 };
