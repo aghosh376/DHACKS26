@@ -27,6 +27,7 @@ const TIME_RANGES = [
 ];
 
 const StockChart: FC<StockChartProps> = ({ professorId }) => {
+  const API_URL = import.meta.env.VITE_API_BASE_URL || '';
   const [history, setHistory] = useState<PriceEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -38,7 +39,7 @@ const StockChart: FC<StockChartProps> = ({ professorId }) => {
         setLoading(true);
         setError('');
         const res = await fetch(
-          `/api/stocks/${professorId}/history?days=${selectedRange}&limit=1000`
+          `${API_URL}/api/stocks/${professorId}/history?days=${selectedRange}&limit=1000`
         );
         if (!res.ok) throw new Error('Failed to fetch history');
         const data = await res.json();
@@ -51,7 +52,7 @@ const StockChart: FC<StockChartProps> = ({ professorId }) => {
     };
 
     fetchHistory();
-  }, [professorId, selectedRange]);
+  }, [professorId, selectedRange, API_URL]);
 
   if (loading) {
     return (

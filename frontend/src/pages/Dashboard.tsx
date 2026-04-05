@@ -106,6 +106,8 @@ interface DashboardProps {
 const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
   const navigate = useNavigate();
 
+  const API_URL = import.meta.env.VITE_API_BASE_URL || '';
+
   const [backendStocks, setBackendStocks] = useState<BackendStock[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -135,7 +137,7 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         };
-        const stocksRes = await fetch("/api/stocks", { headers });
+        const stocksRes = await fetch(`${API_URL}/api/stocks`, { headers });
         if (!stocksRes.ok) throw new Error("Failed to fetch stocks");
         const stocksData = await stocksRes.json();
         const parsed = BackendStocksResponseSchema.safeParse(stocksData);
@@ -158,7 +160,7 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
       }
     };
     fetchInitialData();
-  }, [token]);
+  }, [token, API_URL]);
 
   // ─── Auto-refresh every 10s ───────────────────────────
   useEffect(() => {
@@ -169,7 +171,7 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         };
-        const stocksRes = await fetch("/api/stocks", { headers });
+        const stocksRes = await fetch(`${API_URL}/api/stocks`, { headers });
         if (stocksRes.ok) {
           const stocksData = await stocksRes.json();
           const parsed = BackendStocksResponseSchema.safeParse(stocksData);
@@ -184,7 +186,7 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
       }
     }, 10_000);
     return () => clearInterval(interval);
-  }, [token, useBackend]);
+  }, [token, useBackend, API_URL]);
 
   // ─── Helpers ──────────────────────────────────────────
   const getUserShares = (professorId: string): number =>
@@ -318,7 +320,7 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
       if (!selectedProfessor || !selectedBackendStock || !token) return;
       try {
         setTransactionLoading(true);
-        const response = await fetch(`/api/stocks/${selectedProfessor._id}/buy`, {
+        const response = await fetch(`${API_URL}/api/stocks/${selectedProfessor._id}/buy`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ quantity }),
@@ -402,7 +404,7 @@ const Dashboard: FC<DashboardProps> = ({ user, setToken, setUser }) => {
       if (!selectedProfessor || !selectedBackendStock || !token) return;
       try {
         setTransactionLoading(true);
-        const response = await fetch(`/api/stocks/${selectedProfessor._id}/sell`, {
+        const response = await fetch(`${API_URL}/api/stocks/${selectedProfessor._id}/sell`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ quantity }),
